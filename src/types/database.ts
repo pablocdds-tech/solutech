@@ -13,11 +13,13 @@ import type {
   BankAccountType,
   DocumentType,
   FinanceCategoryType,
+  InventoryMoveType,
   ItemType,
   PaymentMethodType,
   SalesChannelType,
   SourceType,
   StoreType,
+  VirtualLedgerType,
 } from "./index";
 
 // === Tabelas Core (FASE 1) ===
@@ -271,6 +273,88 @@ export interface AdjustmentReason {
   updated_at: string;
 }
 
+// === Tabelas FASE 3 — Estoque + Banco Virtual ===
+
+export interface InventoryMove {
+  id: string;
+  org_id: string;
+  store_id: string;
+  item_id: string;
+  move_type: InventoryMoveType;
+  quantity: number;
+  unit_cost: number;
+  total_cost: number;
+  reference_type: string | null;
+  reference_id: string | null;
+  reason_id: string | null;
+  batch_id: string | null;
+  notes: string | null;
+  source_type: SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface VirtualLedgerEntry {
+  id: string;
+  org_id: string;
+  store_id: string;
+  entry_type: VirtualLedgerType;
+  amount: number;
+  description: string;
+  reference_type: string | null;
+  reference_id: string | null;
+  notes: string | null;
+  source_type: SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+// View types (read-only, derived)
+export interface InventoryBalance {
+  org_id: string;
+  store_id: string;
+  store_name: string;
+  item_id: string;
+  item_name: string;
+  item_type: ItemType;
+  sku: string | null;
+  unit_abbr: string | null;
+  balance: number;
+  total_cost_value: number;
+  avg_unit_cost: number;
+  min_stock: number | null;
+  max_stock: number | null;
+  last_move_at: string | null;
+  total_moves: number;
+}
+
+export interface VirtualLedgerBalance {
+  org_id: string;
+  store_id: string;
+  store_name: string;
+  store_type: StoreType;
+  balance: number;
+  total_debits: number;
+  total_credits: number;
+  total_adjustments: number;
+  total_entries: number;
+  last_entry_at: string | null;
+}
+
+export interface VirtualLedgerStatement {
+  id: string;
+  entry_type: VirtualLedgerType;
+  amount: number;
+  description: string;
+  reference_type: string | null;
+  notes: string | null;
+  created_by_name: string | null;
+  created_at: string;
+  running_balance: number;
+}
+
 // === Tipos para INSERT (sem campos auto-gerados) ===
 
 export type OrgInsert = Omit<Org, "id" | "created_at" | "updated_at"> & {
@@ -384,5 +468,12 @@ export type AdjustmentReasonInsert = Omit<
   AdjustmentReason,
   "id" | "created_at" | "updated_at"
 > & {
+  id?: string;
+};
+
+export type InventoryMoveInsert = Omit<InventoryMove, "id" | "created_at" | "total_cost"> & {
+  id?: string;
+};
+export type VirtualLedgerEntryInsert = Omit<VirtualLedgerEntry, "id" | "created_at"> & {
   id?: string;
 };

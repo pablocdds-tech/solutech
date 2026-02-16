@@ -1,0 +1,14 @@
+FASE 3: Estoque base + Banco Virtual (M4 + M1 estrutural)
+
+- inventory_moves (SSOT): tabela imutavel com move_type IN/OUT/ADJUST
+- virtual_ledger_entries (SSOT): tabela imutavel com entry_type DEBIT/CREDIT/ADJUST
+- v_inventory_balance: view derivada com saldo por loja/item e custo medio
+- v_virtual_ledger_balance: view derivada com saldo virtual por loja
+- get_virtual_ledger_statement: RPC com saldo acumulado
+- RLS: SELECT + INSERT apenas (sem UPDATE/DELETE = imutavel)
+- Server Actions: getInventoryBalance, listInventoryMoves, createAdjustmentMove
+- Server Actions: getVirtualLedgerBalances, getVirtualLedgerStatement, createVirtualLedgerAdjustment
+- Paginas: /estoque, /estoque/movimentos, /banco-virtual, /banco-virtual/extrato/[storeId]
+- Componentes: InventoryBalanceView, InventoryMovesView, VirtualBalanceView, LedgerStatementView
+- Button: adicionada variant outline
+- Nav: Estoque e Banco Virtual adicionados ao sidebar
