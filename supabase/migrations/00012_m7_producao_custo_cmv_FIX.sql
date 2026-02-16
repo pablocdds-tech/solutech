@@ -1,47 +1,47 @@
 -- =============================================
--- Vitaliano ERP — Migração 00012
--- FASE 7: Produção + Custo Real + CMV (M4 profundo)
---
--- CONTRATOS DO ACTION CATALOG:
--- production.create_recipe
--- production.create_order / production.start_order
--- production.register_consumption / production.register_loss
--- production.finalize_order (atômica: OUT insumos + IN produto + custo real + perdas)
--- cmv.compute_for_sales_period (CMV derivado, nunca digitado)
---
--- INVARIANTES:
--- - CMV = derivado de inventory_moves, NUNCA digitado
--- - Custo real = soma dos consumos + perdas na ordem de produção
--- - Finalizar OP: OUT insumos + IN produto acabado + custo real, ATÔMICO
+-- FASE 7 — FIX: Corrige referência reasons_adjustment → adjustment_reasons
+-- Dropa objetos parcialmente criados e recria tudo corretamente
 -- =============================================
 
--- ===========================================
--- 1. ENUMS
--- ===========================================
+-- Dropar views que dependem das tabelas
+DROP VIEW IF EXISTS public.v_cmv_by_period CASCADE;
 
+-- Dropar funções
+DROP FUNCTION IF EXISTS public.fn_finalize_production_order(uuid, numeric) CASCADE;
+DROP FUNCTION IF EXISTS public.fn_compute_cmv_for_period(uuid, date, date) CASCADE;
+
+-- Dropar tabelas na ordem correta (dependências)
+DROP TABLE IF EXISTS public.production_losses CASCADE;
+DROP TABLE IF EXISTS public.production_consumptions CASCADE;
+DROP TABLE IF EXISTS public.production_orders CASCADE;
+DROP TABLE IF EXISTS public.recipe_items CASCADE;
+DROP TABLE IF EXISTS public.recipes CASCADE;
+
+-- Dropar enum
+DROP TYPE IF EXISTS public.production_order_status CASCADE;
+
+-- =============================================
+-- Agora recriar tudo corretamente
+-- =============================================
+
+-- 1. ENUM
 DO $$ BEGIN
   CREATE TYPE public.production_order_status AS ENUM ('draft', 'in_progress', 'finalized', 'cancelled');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
--- ===========================================
--- 2. TABELA: recipes (Fichas Técnicas)
--- ===========================================
-
+-- 2. TABELA: recipes
 CREATE TABLE public.recipes (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id          uuid NOT NULL REFERENCES public.orgs(id) ON DELETE RESTRICT,
   store_id        uuid REFERENCES public.stores(id) ON DELETE SET NULL,
-
   name            text NOT NULL,
   description     text,
   output_item_id  uuid NOT NULL REFERENCES public.items(id) ON DELETE RESTRICT,
   output_quantity numeric(15,4) NOT NULL DEFAULT 1 CHECK (output_quantity > 0),
   output_unit_id  uuid REFERENCES public.units(id) ON DELETE SET NULL,
-
   is_active       boolean NOT NULL DEFAULT true,
   notes           text,
-
   source_type     public.source_type NOT NULL DEFAULT 'user',
   source_id       text,
   created_by      uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -56,10 +56,7 @@ CREATE UNIQUE INDEX idx_recipe_name_org ON public.recipes(org_id, lower(name)) W
 CREATE TRIGGER trg_recipe_updated_at BEFORE UPDATE ON public.recipes
   FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 
--- ===========================================
--- 3. TABELA: recipe_items (Insumos da Ficha)
--- ===========================================
-
+-- 3. TABELA: recipe_items
 CREATE TABLE public.recipe_items (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id          uuid NOT NULL REFERENCES public.orgs(id) ON DELETE RESTRICT,
@@ -80,34 +77,26 @@ CREATE UNIQUE INDEX idx_ri_unique ON public.recipe_items(recipe_id, item_id);
 CREATE TRIGGER trg_ri_updated_at BEFORE UPDATE ON public.recipe_items
   FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 
--- ===========================================
--- 4. TABELA: production_orders (Ordens de Produção)
--- ===========================================
-
+-- 4. TABELA: production_orders
 CREATE TABLE public.production_orders (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id            uuid NOT NULL REFERENCES public.orgs(id) ON DELETE RESTRICT,
   store_id          uuid NOT NULL REFERENCES public.stores(id) ON DELETE RESTRICT,
   recipe_id         uuid NOT NULL REFERENCES public.recipes(id) ON DELETE RESTRICT,
-
   status            public.production_order_status NOT NULL DEFAULT 'draft',
   planned_quantity  numeric(15,4) NOT NULL CHECK (planned_quantity > 0),
   actual_quantity   numeric(15,4),
   planned_date      date NOT NULL DEFAULT CURRENT_DATE,
-
   total_input_cost  numeric(15,4) NOT NULL DEFAULT 0,
   total_loss_cost   numeric(15,4) NOT NULL DEFAULT 0,
   real_unit_cost    numeric(15,4) NOT NULL DEFAULT 0,
-
   notes             text,
-
   started_at        timestamptz,
   started_by        uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   finalized_at      timestamptz,
   finalized_by      uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   cancelled_at      timestamptz,
   cancelled_by      uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
-
   source_type       public.source_type NOT NULL DEFAULT 'user',
   source_id         text,
   created_by        uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -123,10 +112,7 @@ CREATE INDEX idx_po_date ON public.production_orders(org_id, planned_date DESC);
 CREATE TRIGGER trg_po_updated_at BEFORE UPDATE ON public.production_orders
   FOR EACH ROW EXECUTE FUNCTION public.fn_set_updated_at();
 
--- ===========================================
--- 5. TABELA: production_consumptions (Consumos registrados)
--- ===========================================
-
+-- 5. TABELA: production_consumptions
 CREATE TABLE public.production_consumptions (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id              uuid NOT NULL REFERENCES public.orgs(id) ON DELETE RESTRICT,
@@ -144,10 +130,7 @@ CREATE TABLE public.production_consumptions (
 CREATE INDEX idx_pc_order ON public.production_consumptions(production_order_id);
 CREATE INDEX idx_pc_item ON public.production_consumptions(item_id);
 
--- ===========================================
--- 6. TABELA: production_losses (Perdas registradas)
--- ===========================================
-
+-- 6. TABELA: production_losses (CORRIGIDO: adjustment_reasons)
 CREATE TABLE public.production_losses (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id              uuid NOT NULL REFERENCES public.orgs(id) ON DELETE RESTRICT,
@@ -167,17 +150,13 @@ CREATE TABLE public.production_losses (
 CREATE INDEX idx_pl_order ON public.production_losses(production_order_id);
 CREATE INDEX idx_pl_item ON public.production_losses(item_id);
 
--- ===========================================
 -- 7. RLS
--- ===========================================
-
 ALTER TABLE public.recipes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.recipe_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.production_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.production_consumptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.production_losses ENABLE ROW LEVEL SECURITY;
 
--- recipes
 CREATE POLICY "recipe_select" ON public.recipes FOR SELECT
   USING (org_id = public.get_my_org_id());
 CREATE POLICY "recipe_insert" ON public.recipes FOR INSERT
@@ -186,7 +165,6 @@ CREATE POLICY "recipe_update" ON public.recipes FOR UPDATE
   USING (org_id = public.get_my_org_id())
   WITH CHECK (org_id = public.get_my_org_id());
 
--- recipe_items
 CREATE POLICY "ri_select" ON public.recipe_items FOR SELECT
   USING (org_id = public.get_my_org_id());
 CREATE POLICY "ri_insert" ON public.recipe_items FOR INSERT
@@ -197,7 +175,6 @@ CREATE POLICY "ri_update" ON public.recipe_items FOR UPDATE
 CREATE POLICY "ri_delete" ON public.recipe_items FOR DELETE
   USING (org_id = public.get_my_org_id());
 
--- production_orders
 CREATE POLICY "po_select" ON public.production_orders FOR SELECT
   USING (org_id = public.get_my_org_id());
 CREATE POLICY "po_insert" ON public.production_orders FOR INSERT
@@ -206,23 +183,17 @@ CREATE POLICY "po_update" ON public.production_orders FOR UPDATE
   USING (org_id = public.get_my_org_id())
   WITH CHECK (org_id = public.get_my_org_id());
 
--- production_consumptions (imutáveis como inventory_moves: apenas SELECT + INSERT)
 CREATE POLICY "pc_select" ON public.production_consumptions FOR SELECT
   USING (org_id = public.get_my_org_id());
 CREATE POLICY "pc_insert" ON public.production_consumptions FOR INSERT
   WITH CHECK (org_id = public.get_my_org_id());
 
--- production_losses (imutáveis: apenas SELECT + INSERT)
 CREATE POLICY "pl_select" ON public.production_losses FOR SELECT
   USING (org_id = public.get_my_org_id());
 CREATE POLICY "pl_insert" ON public.production_losses FOR INSERT
   WITH CHECK (org_id = public.get_my_org_id());
 
--- ===========================================
 -- 8. FUNÇÃO ATÔMICA: fn_finalize_production_order
--- OUT insumos + IN produto acabado + custo real + perdas + audit
--- ===========================================
-
 CREATE OR REPLACE FUNCTION public.fn_finalize_production_order(
   p_order_id uuid,
   p_actual_quantity numeric DEFAULT NULL
@@ -248,7 +219,6 @@ BEGIN
   v_user_id := auth.uid();
   v_org_id  := public.get_my_org_id();
 
-  -- 1. Lock ordem
   SELECT * INTO v_order FROM production_orders WHERE id = p_order_id FOR UPDATE;
 
   IF v_order IS NULL THEN
@@ -258,7 +228,6 @@ BEGIN
     RAISE EXCEPTION 'Acesso negado';
   END IF;
 
-  -- Idempotência
   IF v_order.status = 'finalized' THEN
     RETURN jsonb_build_object('success', true, 'idempotent', true, 'message', 'Ordem já finalizada');
   END IF;
@@ -269,10 +238,8 @@ BEGIN
 
   v_actual_qty := COALESCE(p_actual_quantity, v_order.planned_quantity);
 
-  -- Buscar receita
   SELECT * INTO v_recipe FROM recipes WHERE id = v_order.recipe_id;
 
-  -- 2. Processar consumos → gerar inventory_moves OUT
   FOR r_cons IN
     SELECT item_id, SUM(quantity) as qty, AVG(unit_cost) as avg_cost
     FROM production_consumptions
@@ -291,7 +258,6 @@ BEGIN
     v_total_input_cost := v_total_input_cost + (r_cons.qty * r_cons.avg_cost);
   END LOOP;
 
-  -- 3. Processar perdas → gerar inventory_moves OUT (perda)
   FOR r_loss IN
     SELECT item_id, SUM(quantity) as qty, AVG(unit_cost) as avg_cost
     FROM production_losses
@@ -310,14 +276,12 @@ BEGIN
     v_total_loss_cost := v_total_loss_cost + (r_loss.qty * r_loss.avg_cost);
   END LOOP;
 
-  -- 4. Custo real unitário
   IF v_actual_qty > 0 THEN
     v_real_unit_cost := (v_total_input_cost + v_total_loss_cost) / v_actual_qty;
   ELSE
     v_real_unit_cost := 0;
   END IF;
 
-  -- 5. Gerar inventory_moves IN (produto acabado)
   INSERT INTO inventory_moves (
     org_id, store_id, item_id, move_type, quantity, unit_cost,
     reference_type, reference_id, source_type, source_id, created_by
@@ -327,7 +291,6 @@ BEGIN
     'production_order', v_order.id, 'system', v_order.id::text, v_user_id
   );
 
-  -- 6. Atualizar ordem
   UPDATE production_orders
   SET status = 'finalized',
       actual_quantity = v_actual_qty,
@@ -339,7 +302,6 @@ BEGIN
       updated_at = now()
   WHERE id = p_order_id;
 
-  -- 7. Audit
   PERFORM fn_audit_log(
     v_order.org_id, v_order.store_id, v_user_id,
     'finalize_production_order', 'production_orders', p_order_id,
@@ -371,12 +333,7 @@ $$;
 COMMENT ON FUNCTION public.fn_finalize_production_order IS
   'Finaliza OP atomicamente: OUT insumos + OUT perdas + IN produto acabado com custo real. Idempotente.';
 
--- ===========================================
--- 9. VIEW: CMV derivado
--- CMV = custo dos produtos vendidos num período
--- Calculado a partir de inventory_moves (OUT com ref venda/produção)
--- ===========================================
-
+-- 9. VIEW: v_cmv_by_period
 CREATE OR REPLACE VIEW public.v_cmv_by_period AS
 SELECT
   im.org_id,
@@ -396,11 +353,7 @@ GROUP BY im.org_id, im.store_id, date_trunc('month', im.created_at), im.item_id;
 COMMENT ON VIEW public.v_cmv_by_period IS
   'CMV derivado por período/loja/item. NUNCA digitado. Calculado a partir de inventory_moves.';
 
--- ===========================================
 -- 10. FUNÇÃO RPC: fn_compute_cmv_for_period
--- Retorna CMV consolidado para um período
--- ===========================================
-
 CREATE OR REPLACE FUNCTION public.fn_compute_cmv_for_period(
   p_store_id uuid DEFAULT NULL,
   p_date_from date DEFAULT date_trunc('month', CURRENT_DATE)::date,
@@ -447,9 +400,7 @@ $$;
 COMMENT ON FUNCTION public.fn_compute_cmv_for_period IS
   'Retorna CMV derivado por loja/item para um período. CMV NUNCA é digitado.';
 
--- ===========================================
 -- VERIFICAÇÃO
--- ===========================================
 DO $$
 DECLARE t_count int; v_count int;
 BEGIN
