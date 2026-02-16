@@ -1,3 +1,5 @@
+import { DashboardNav } from "./dashboard-nav";
+
 /**
  * Layout do dashboard — shell principal do ERP.
  * Futuramente terá: sidebar, header com seletor de loja,
@@ -15,12 +17,7 @@ export default function DashboardLayout({
         <div className="flex h-16 items-center px-6">
           <span className="text-lg font-bold text-white">Vitaliano ERP</span>
         </div>
-        <nav className="mt-4 space-y-1 px-3">
-          {/* Navegação será dinâmica com base nas permissões do usuário */}
-          <div className="rounded-lg bg-sidebar-active/20 px-3 py-2 text-sm font-medium text-white">
-            Dashboard
-          </div>
-        </nav>
+        <DashboardNav />
       </aside>
 
       {/* Conteúdo principal */}

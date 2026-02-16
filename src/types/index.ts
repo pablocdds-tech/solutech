@@ -69,6 +69,28 @@ export type VirtualLedgerType =
   | "CREDIT" // Pagamento real abateu débito
   | "ADJUST"; // Ajuste administrativo (exceção)
 
+// === Tipos de Item ===
+export type ItemType = "product" | "ingredient" | "supply";
+
+// === Tipos de Categoria Financeira ===
+export type FinanceCategoryType = "revenue" | "expense";
+
+// === Tipos de Forma de Pagamento ===
+export type PaymentMethodType =
+  | "cash" | "credit_card" | "debit_card" | "pix"
+  | "bank_transfer" | "boleto" | "check" | "voucher" | "other";
+
+// === Tipos de Canal de Venda ===
+export type SalesChannelType =
+  | "store" | "ifood" | "rappi" | "uber_eats"
+  | "whatsapp" | "phone" | "website" | "other";
+
+// === Direção de Ajuste ===
+export type AdjustmentDirection = "positive" | "negative" | "both";
+
+// === Tipo de Conta Bancária ===
+export type BankAccountType = "checking" | "savings" | "investment";
+
 // === Paginação ===
 export interface PaginationParams {
   page: number;
