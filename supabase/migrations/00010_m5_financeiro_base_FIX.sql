@@ -1,21 +1,34 @@
 -- =============================================
--- Vitaliano ERP — Migração 00010
+-- Vitaliano ERP — Migração 00010 (CORRIGIDA)
 -- FASE 5: Financeiro base (M5)
 --
--- INVARIANTES:
--- - Saldo bancário real = SUM(bank_transactions). Não existe saldo editável.
--- - AP/AR só mudam para paid/received COM evidência (bank_transaction ou caixa).
--- - cash_sessions controlam abertura/fechamento de caixa com diferença calculada.
--- - ap_payables já existe (FASE 4); aqui adicionamos AR, bank_tx, cash.
+-- FIX: receivable_status já existe da FASE 1.
+-- Adicionamos 'cancelled' ao enum existente e criamos
+-- apenas os novos tipos.
 -- =============================================
 
 -- ===========================================
--- 1. ENUMS
+-- 1. ENUMS (com tratamento de existência)
 -- ===========================================
 
-CREATE TYPE public.bank_tx_type AS ENUM ('credit', 'debit');
-CREATE TYPE public.receivable_status AS ENUM ('pending', 'partial', 'received', 'cancelled');
-CREATE TYPE public.cash_session_status AS ENUM ('open', 'closed');
+-- bank_tx_type é novo
+DO $$ BEGIN
+  CREATE TYPE public.bank_tx_type AS ENUM ('credit', 'debit');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- receivable_status já existe com (pending, partial, received, overdue)
+-- Adicionamos 'cancelled' se não existir
+DO $$ BEGIN
+  ALTER TYPE public.receivable_status ADD VALUE IF NOT EXISTS 'cancelled';
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- cash_session_status é novo
+DO $$ BEGIN
+  CREATE TYPE public.cash_session_status AS ENUM ('open', 'closed');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ===========================================
 -- 2. TABELA: bank_transactions (SSOT do saldo bancário real)
@@ -32,13 +45,11 @@ CREATE TABLE public.bank_transactions (
   description         text NOT NULL,
   transaction_date    date NOT NULL DEFAULT CURRENT_DATE,
 
-  -- OFX / Conciliação (FASE 8)
   fitid               text,
   hash_key            text,
   reconciled          boolean NOT NULL DEFAULT false,
   reconciled_at       timestamptz,
 
-  -- Referência cruzada
   reference_type      text,
   reference_id        uuid,
 
@@ -50,12 +61,10 @@ CREATE TABLE public.bank_transactions (
   updated_at          timestamptz NOT NULL DEFAULT now()
 );
 
--- Anti-duplicidade OFX: unique por (bank_account_id, fitid)
 CREATE UNIQUE INDEX uq_bank_tx_fitid
   ON public.bank_transactions(bank_account_id, fitid)
   WHERE fitid IS NOT NULL;
 
--- Anti-duplicidade OFX fallback: hash_key
 CREATE UNIQUE INDEX uq_bank_tx_hash
   ON public.bank_transactions(bank_account_id, hash_key)
   WHERE hash_key IS NOT NULL;
@@ -93,11 +102,9 @@ CREATE TABLE public.ar_receivables (
   finance_category_id uuid REFERENCES public.finance_categories(id) ON DELETE SET NULL,
   cost_center_id      uuid REFERENCES public.cost_centers(id) ON DELETE SET NULL,
 
-  -- Evidência de recebimento
   bank_transaction_id uuid REFERENCES public.bank_transactions(id) ON DELETE SET NULL,
   cash_session_id     uuid,
 
-  -- Referência origem (vendas etc.)
   reference_type      text,
   reference_id        uuid,
 
@@ -145,7 +152,6 @@ CREATE TABLE public.cash_sessions (
   updated_at          timestamptz NOT NULL DEFAULT now()
 );
 
--- Apenas um caixa aberto por loja
 CREATE UNIQUE INDEX uq_cash_session_open
   ON public.cash_sessions(store_id)
   WHERE status = 'open';
@@ -168,7 +174,6 @@ ALTER TABLE public.bank_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ar_receivables ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cash_sessions ENABLE ROW LEVEL SECURITY;
 
--- bank_transactions
 CREATE POLICY "bank_tx_select" ON public.bank_transactions FOR SELECT
   USING (org_id = public.get_my_org_id() AND public.has_store_access(store_id));
 
@@ -179,7 +184,6 @@ CREATE POLICY "bank_tx_update" ON public.bank_transactions FOR UPDATE
   USING (org_id = public.get_my_org_id())
   WITH CHECK (org_id = public.get_my_org_id());
 
--- ar_receivables
 CREATE POLICY "ar_select" ON public.ar_receivables FOR SELECT
   USING (org_id = public.get_my_org_id() AND public.has_store_access(store_id));
 
@@ -190,7 +194,6 @@ CREATE POLICY "ar_update" ON public.ar_receivables FOR UPDATE
   USING (org_id = public.get_my_org_id())
   WITH CHECK (org_id = public.get_my_org_id());
 
--- cash_sessions
 CREATE POLICY "cash_select" ON public.cash_sessions FOR SELECT
   USING (org_id = public.get_my_org_id() AND public.has_store_access(store_id));
 
@@ -232,7 +235,6 @@ COMMENT ON VIEW public.v_bank_balance IS
 
 -- ===========================================
 -- 7. FUNÇÃO ATÔMICA: fn_pay_ap
--- Baixar conta a pagar COM evidência bank_transaction
 -- ===========================================
 
 CREATE OR REPLACE FUNCTION public.fn_pay_ap(
@@ -259,7 +261,6 @@ BEGIN
   v_user_id := auth.uid();
   v_org_id  := public.get_my_org_id();
 
-  -- 1. Lock AP
   SELECT * INTO v_ap FROM ap_payables WHERE id = p_payable_id FOR UPDATE;
 
   IF v_ap IS NULL THEN
@@ -275,27 +276,23 @@ BEGIN
     RAISE EXCEPTION 'Valor de pagamento deve ser positivo';
   END IF;
 
-  -- 2. Validar conta bancária
   SELECT * INTO v_ba FROM bank_accounts WHERE id = p_bank_account_id;
   IF v_ba IS NULL THEN
     RAISE EXCEPTION 'Conta bancária não encontrada';
   END IF;
 
-  -- 3. Calcular novo saldo pago
   v_new_paid := v_ap.paid_amount + p_amount;
   IF v_new_paid > v_ap.amount THEN
     RAISE EXCEPTION 'Pagamento excede o valor da conta (% + % > %)',
       v_ap.paid_amount, p_amount, v_ap.amount;
   END IF;
 
-  -- 4. Determinar novo status
   IF v_new_paid >= v_ap.amount THEN
     v_new_status := 'paid';
   ELSE
     v_new_status := 'partial';
   END IF;
 
-  -- 5. Criar bank_transaction (evidência — DEBIT porque é saída)
   INSERT INTO bank_transactions (
     org_id, store_id, bank_account_id, type, amount, description,
     transaction_date, reference_type, reference_id,
@@ -307,7 +304,6 @@ BEGIN
     'system', v_ap.id::text, v_user_id
   ) RETURNING id INTO v_bank_tx_id;
 
-  -- 6. Atualizar AP
   UPDATE ap_payables
   SET status = v_new_status,
       paid_amount = v_new_paid,
@@ -316,7 +312,6 @@ BEGIN
       updated_at = now()
   WHERE id = p_payable_id;
 
-  -- 7. Audit
   PERFORM fn_audit_log(
     v_org_id, v_ap.store_id, v_user_id,
     'pay_ap', 'ap_payables', p_payable_id,
@@ -341,7 +336,6 @@ COMMENT ON FUNCTION public.fn_pay_ap IS
 
 -- ===========================================
 -- 8. FUNÇÃO ATÔMICA: fn_receive_ar
--- Baixar conta a receber COM evidência
 -- ===========================================
 
 CREATE OR REPLACE FUNCTION public.fn_receive_ar(
@@ -367,7 +361,6 @@ BEGIN
   v_user_id := auth.uid();
   v_org_id  := public.get_my_org_id();
 
-  -- 1. Lock AR
   SELECT * INTO v_ar FROM ar_receivables WHERE id = p_receivable_id FOR UPDATE;
 
   IF v_ar IS NULL THEN
@@ -383,7 +376,6 @@ BEGIN
     RAISE EXCEPTION 'Valor deve ser positivo';
   END IF;
 
-  -- 2. Calcular novo recebido
   v_new_received := v_ar.received_amount + p_amount;
   IF v_new_received > v_ar.amount THEN
     RAISE EXCEPTION 'Recebimento excede o valor (% + % > %)',
@@ -396,7 +388,6 @@ BEGIN
     v_new_status := 'partial';
   END IF;
 
-  -- 3. Criar bank_transaction (evidência — CREDIT porque é entrada)
   INSERT INTO bank_transactions (
     org_id, store_id, bank_account_id, type, amount, description,
     transaction_date, reference_type, reference_id,
@@ -408,7 +399,6 @@ BEGIN
     'system', v_ar.id::text, v_user_id
   ) RETURNING id INTO v_bank_tx_id;
 
-  -- 4. Atualizar AR
   UPDATE ar_receivables
   SET status = v_new_status,
       received_amount = v_new_received,
@@ -417,7 +407,6 @@ BEGIN
       updated_at = now()
   WHERE id = p_receivable_id;
 
-  -- 5. Audit
   PERFORM fn_audit_log(
     v_org_id, v_ar.store_id, v_user_id,
     'receive_ar', 'ar_receivables', p_receivable_id,
@@ -461,7 +450,6 @@ BEGIN
   v_user_id := auth.uid();
   v_org_id  := public.get_my_org_id();
 
-  -- Verifica se já existe caixa aberto (unique index cuida, mas erro mais claro)
   IF EXISTS (SELECT 1 FROM cash_sessions WHERE store_id = p_store_id AND status = 'open') THEN
     RAISE EXCEPTION 'Já existe um caixa aberto para esta loja';
   END IF;
@@ -516,8 +504,6 @@ BEGIN
     RAISE EXCEPTION 'Caixa já está fechado';
   END IF;
 
-  -- Calcula saldo esperado (opening + credits - debits durante a sessão)
-  -- Simplificado: usa opening_balance por enquanto (será refinado com cash_movements)
   v_expected := v_session.opening_balance;
 
   UPDATE cash_sessions
