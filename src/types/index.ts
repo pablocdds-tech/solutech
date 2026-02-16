@@ -127,6 +127,21 @@ export type ReconciliationMatchType = "link" | "create" | "split" | "ignore";
 // === Status de Venda ===
 export type SaleStatus = "draft" | "confirmed" | "cancelled";
 
+// === Status de Contagem ===
+export type InventoryCountStatus = "open" | "counting" | "review" | "approved" | "cancelled";
+
+// === Status de Checklist ===
+export type ChecklistStatus = "pending" | "in_progress" | "completed" | "expired";
+
+// === Resultado de Item de Checklist ===
+export type ChecklistItemResult = "ok" | "nok" | "na" | "pending";
+
+// === Canal de Notificação ===
+export type NotificationChannel = "inbox" | "email" | "whatsapp";
+
+// === Prioridade de Notificação ===
+export type NotificationPriority = "low" | "normal" | "high" | "critical";
+
 // === Paginação ===
 export interface PaginationParams {
   page: number;

@@ -15,6 +15,9 @@ const navItems = [
   { href: "/cd-loja", label: "CD → Loja" },
   { href: "/conciliacao", label: "Conciliação OFX" },
   { href: "/banco-virtual", label: "Banco Virtual" },
+  { href: "/contagens", label: "Contagens" },
+  { href: "/checklists", label: "Checklists" },
+  { href: "/notificacoes", label: "Notificações" },
 ];
 
 export function DashboardNav() {

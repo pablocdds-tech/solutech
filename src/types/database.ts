@@ -971,3 +971,143 @@ export type SaleInsert = Omit<
 export type SaleItemInsert = Omit<SaleItem, "id" | "created_at" | "updated_at" | "total_price"> & { id?: string };
 
 export type SalePaymentInsert = Omit<SalePayment, "id" | "created_at"> & { id?: string };
+
+// === Tabelas FASE 10 — Contagens + Checklists + Notificações ===
+
+export interface InventoryCount {
+  id: string;
+  org_id: string;
+  store_id: string;
+  status: import("./index").InventoryCountStatus;
+  count_date: string;
+  title: string;
+  description: string | null;
+  total_items: number;
+  counted_items: number;
+  divergent_items: number;
+  approved_at: string | null;
+  approved_by: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  access_token: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InventoryCountItem {
+  id: string;
+  org_id: string;
+  inventory_count_id: string;
+  item_id: string;
+  expected_quantity: number;
+  counted_quantity: number | null;
+  difference: number | null;
+  is_divergent: boolean | null;
+  counted_by: string | null;
+  counted_at: string | null;
+  unit_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChecklistTemplate {
+  id: string;
+  org_id: string;
+  store_id: string | null;
+  name: string;
+  description: string | null;
+  category: string | null;
+  is_active: boolean;
+  schedule_type: string | null;
+  schedule_config: Record<string, unknown> | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChecklistTemplateItem {
+  id: string;
+  org_id: string;
+  template_id: string;
+  title: string;
+  description: string | null;
+  sort_order: number;
+  requires_evidence: boolean;
+  is_critical: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChecklistTask {
+  id: string;
+  org_id: string;
+  store_id: string;
+  template_id: string;
+  status: import("./index").ChecklistStatus;
+  task_date: string;
+  shift: string | null;
+  due_at: string | null;
+  total_items: number;
+  completed_items: number;
+  nok_items: number;
+  score_pct: number;
+  started_at: string | null;
+  completed_at: string | null;
+  assigned_to: string | null;
+  completed_by: string | null;
+  notes: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChecklistTaskItem {
+  id: string;
+  org_id: string;
+  task_id: string;
+  template_item_id: string;
+  result: import("./index").ChecklistItemResult;
+  evidence_url: string | null;
+  evidence_document_id: string | null;
+  observation: string | null;
+  responded_by: string | null;
+  responded_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Notification {
+  id: string;
+  org_id: string;
+  user_id: string;
+  store_id: string | null;
+  title: string;
+  body: string | null;
+  priority: import("./index").NotificationPriority;
+  channel: import("./index").NotificationChannel;
+  reference_type: string | null;
+  reference_id: string | null;
+  is_read: boolean;
+  read_at: string | null;
+  sent_external: boolean;
+  sent_external_at: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_at: string;
+}
+
+export type InventoryCountInsert = Omit<InventoryCount, "id" | "created_at" | "updated_at" | "total_items" | "counted_items" | "divergent_items" | "approved_at" | "approved_by" | "cancelled_at" | "cancelled_by" | "access_token"> & { id?: string };
+
+export type InventoryCountItemInsert = Omit<InventoryCountItem, "id" | "created_at" | "updated_at" | "difference" | "is_divergent"> & { id?: string };
+
+export type ChecklistTemplateInsert = Omit<ChecklistTemplate, "id" | "created_at" | "updated_at"> & { id?: string };
+
+export type ChecklistTaskInsert = Omit<ChecklistTask, "id" | "created_at" | "updated_at" | "total_items" | "completed_items" | "nok_items" | "score_pct" | "started_at" | "completed_at" | "completed_by"> & { id?: string };
