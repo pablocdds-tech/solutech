@@ -35,7 +35,7 @@ SELECT
 
   -- Compras do mês
   (SELECT COALESCE(SUM(r.total_amount), 0)
-   FROM receivings r WHERE r.org_id = o.id AND r.destination_store_id = s.id
+   FROM receivings r WHERE r.org_id = o.id AND r.store_id = s.id
    AND r.status = 'confirmed'
    AND r.created_at >= date_trunc('month', CURRENT_DATE)) AS purchases_month,
 
