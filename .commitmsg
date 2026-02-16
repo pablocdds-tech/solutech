@@ -1,18 +1,19 @@
-FASE 4: NF/Compras com Action Catalog (M3)
+FASE 5: Financeiro base (M5)
 
-- Tabelas: receivings, receiving_items, receiving_payments, ap_payables
-- Enums: receiving_status, receiving_item_match, payable_status
-- fn_confirm_receiving: funcao atomica e idempotente (estoque IN + AP + audit)
-- fn_cancel_receiving_draft: cancelar rascunho com audit
-- fn_validate_receiving_draft: validar draft antes de confirmar
-- Uniques anti-duplicidade: invoice_key ou (supplier+number+date)
-- RLS: org_id + store_access para ap_payables
-- Action Catalog completo: createReceivingDraft, updateReceivingHeader,
-  addReceivingItem, resolveLineItemMatch, ignoreLineItem, removeReceivingItem,
-  setPaymentPlan, validateReceivingDraft, confirmReceiving, cancelReceivingDraft,
-  uploadDocument, listReceivings, getReceiving, getReceivingItems,
-  getReceivingPayments, listApPayables
-- Types: Receiving, ReceivingItem, ReceivingPayment, ApPayable + Insert types
-- Paginas: /compras (listagem), /compras/novo (formulario), /compras/[id] (detalhe)
-- UI completa: fluxo draft -> itens -> match -> pagamento -> validar -> confirmar
-- Nav: Compras/NF adicionado ao sidebar
+- Tabelas: bank_transactions (SSOT saldo real), ar_receivables, cash_sessions
+- Enums: bank_tx_type, receivable_status, cash_session_status
+- View: v_bank_balance (saldo bancario derivado por conta)
+- fn_pay_ap: atomica — baixa AP com evidencia bank_transaction (DEBIT)
+- fn_receive_ar: atomica — baixa AR com evidencia bank_transaction (CREDIT)
+- fn_open_cash_session: abre caixa (unique por loja quando open)
+- fn_close_cash_session: fecha caixa com diferenca calculada
+- Anti-duplicidade OFX: unique (bank_account_id, fitid) e (bank_account_id, hash_key)
+- RLS: org_id + store_access para todas as tabelas
+- Server Actions: listApPayables, createApPayable, payAp, listArReceivables,
+  createArReceivable, receiveAr, getBankBalances, listBankTransactions,
+  createBankTransaction, listCashSessions, openCashSession, closeCashSession
+- Types: BankTransaction, ArReceivable, CashSession, BankBalance + Insert types
+- Paginas: /financeiro (hub), /financeiro/contas-pagar, /financeiro/contas-receber,
+  /financeiro/bancos, /financeiro/caixa
+- Invariante: paid/received SOMENTE com evidencia bancaria
+- Nav: Financeiro adicionado ao sidebar

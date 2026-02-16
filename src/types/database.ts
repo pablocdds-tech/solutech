@@ -561,6 +561,93 @@ export type AdjustmentReasonInsert = Omit<
   id?: string;
 };
 
+// === Tabelas FASE 5 — Financeiro base (M5) ===
+
+export interface BankTransaction {
+  id: string;
+  org_id: string;
+  store_id: string;
+  bank_account_id: string;
+  type: import("./index").BankTxType;
+  amount: number;
+  description: string;
+  transaction_date: string;
+  fitid: string | null;
+  hash_key: string | null;
+  reconciled: boolean;
+  reconciled_at: string | null;
+  reference_type: string | null;
+  reference_id: string | null;
+  notes: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArReceivable {
+  id: string;
+  org_id: string;
+  store_id: string;
+  status: import("./index").ArReceivableStatus;
+  description: string;
+  amount: number;
+  received_amount: number;
+  due_date: string;
+  received_at: string | null;
+  sales_channel_id: string | null;
+  payment_method_id: string | null;
+  finance_category_id: string | null;
+  cost_center_id: string | null;
+  bank_transaction_id: string | null;
+  cash_session_id: string | null;
+  reference_type: string | null;
+  reference_id: string | null;
+  installment: number;
+  total_installments: number;
+  notes: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CashSession {
+  id: string;
+  org_id: string;
+  store_id: string;
+  status: import("./index").CashSessionStatus;
+  opening_balance: number;
+  closing_balance: number | null;
+  expected_balance: number | null;
+  difference: number | null;
+  opened_by: string | null;
+  opened_at: string;
+  closed_by: string | null;
+  closed_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BankBalance {
+  org_id: string;
+  store_id: string;
+  store_name: string;
+  bank_account_id: string;
+  account_name: string;
+  bank_name: string | null;
+  account_type: import("./index").BankAccountType;
+  total_credits: number;
+  total_debits: number;
+  balance: number;
+  total_transactions: number;
+  pending_reconciliation: number;
+  last_transaction_date: string | null;
+}
+
 export type InventoryMoveInsert = Omit<InventoryMove, "id" | "created_at" | "total_cost"> & {
   id?: string;
 };
@@ -582,5 +669,17 @@ export type ReceivingPaymentInsert = Omit<ReceivingPayment, "id" | "created_at">
 };
 
 export type ApPayableInsert = Omit<ApPayable, "id" | "created_at" | "updated_at"> & {
+  id?: string;
+};
+
+export type BankTransactionInsert = Omit<BankTransaction, "id" | "created_at" | "updated_at"> & {
+  id?: string;
+};
+
+export type ArReceivableInsert = Omit<ArReceivable, "id" | "created_at" | "updated_at"> & {
+  id?: string;
+};
+
+export type CashSessionInsert = Omit<CashSession, "id" | "created_at" | "updated_at" | "closed_at" | "closed_by"> & {
   id?: string;
 };

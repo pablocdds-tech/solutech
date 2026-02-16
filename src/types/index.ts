@@ -100,6 +100,15 @@ export type ReceivingItemMatch = "pending" | "matched" | "created" | "ignored";
 // === Status de Conta a Pagar ===
 export type PayableStatus = "pending" | "partial" | "paid" | "cancelled";
 
+// === Tipo de Transação Bancária ===
+export type BankTxType = "credit" | "debit";
+
+// === Status de Conta a Receber ===
+export type ArReceivableStatus = "pending" | "partial" | "received" | "cancelled";
+
+// === Status de Sessão de Caixa ===
+export type CashSessionStatus = "open" | "closed";
+
 // === Paginação ===
 export interface PaginationParams {
   page: number;
