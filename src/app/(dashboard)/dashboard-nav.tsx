@@ -18,6 +18,7 @@ const navItems = [
   { href: "/contagens", label: "Contagens" },
   { href: "/checklists", label: "Checklists" },
   { href: "/notificacoes", label: "Notificações" },
+  { href: "/relatorios", label: "Relatórios" },
 ];
 
 export function DashboardNav() {
