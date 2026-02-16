@@ -839,3 +839,72 @@ export type ProductionOrderInsert = Omit<
 export type ProductionConsumptionInsert = Omit<ProductionConsumption, "id" | "created_at" | "total_cost"> & { id?: string };
 
 export type ProductionLossInsert = Omit<ProductionLoss, "id" | "created_at" | "total_cost"> & { id?: string };
+
+// === Tabelas FASE 8 — OFX/Conciliação ===
+
+export interface OfxImport {
+  id: string;
+  org_id: string;
+  store_id: string;
+  bank_account_id: string;
+  status: import("./index").OfxImportStatus;
+  file_name: string;
+  document_id: string | null;
+  total_lines: number;
+  matched_lines: number;
+  ignored_lines: number;
+  pending_lines: number;
+  period_start: string | null;
+  period_end: string | null;
+  imported_at: string | null;
+  notes: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OfxLine {
+  id: string;
+  org_id: string;
+  ofx_import_id: string;
+  bank_account_id: string;
+  fitid: string | null;
+  hash_key: string | null;
+  transaction_date: string;
+  amount: number;
+  description: string | null;
+  memo: string | null;
+  type_code: string | null;
+  status: import("./index").OfxLineStatus;
+  bank_transaction_id: string | null;
+  raw_data: Record<string, unknown> | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReconciliationMatch {
+  id: string;
+  org_id: string;
+  ofx_line_id: string;
+  bank_transaction_id: string | null;
+  ap_payable_id: string | null;
+  ar_receivable_id: string | null;
+  match_type: import("./index").ReconciliationMatchType;
+  amount: number;
+  is_active: boolean;
+  matched_by: string | null;
+  matched_at: string;
+  unmatched_by: string | null;
+  unmatched_at: string | null;
+  unmatch_reason: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_at: string;
+}
+
+export type OfxImportInsert = Omit<OfxImport, "id" | "created_at" | "updated_at" | "total_lines" | "matched_lines" | "ignored_lines" | "pending_lines" | "imported_at"> & { id?: string };
+
+export type OfxLineInsert = Omit<OfxLine, "id" | "created_at" | "updated_at"> & { id?: string };

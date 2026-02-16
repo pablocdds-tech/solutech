@@ -115,6 +115,15 @@ export type InternalOrderStatus = "draft" | "confirmed" | "cancelled";
 // === Status de Ordem de Produção ===
 export type ProductionOrderStatus = "draft" | "in_progress" | "finalized" | "cancelled";
 
+// === Status de Importação OFX ===
+export type OfxImportStatus = "pending" | "processing" | "completed" | "failed";
+
+// === Status de Linha OFX ===
+export type OfxLineStatus = "pending" | "matched" | "split" | "ignored" | "created";
+
+// === Tipo de Match de Conciliação ===
+export type ReconciliationMatchType = "link" | "create" | "split" | "ignore";
+
 // === Paginação ===
 export interface PaginationParams {
   page: number;

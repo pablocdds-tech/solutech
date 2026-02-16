@@ -12,6 +12,7 @@ const navItems = [
   { href: "/estoque", label: "Estoque" },
   { href: "/producao", label: "Produção" },
   { href: "/cd-loja", label: "CD → Loja" },
+  { href: "/conciliacao", label: "Conciliação OFX" },
   { href: "/banco-virtual", label: "Banco Virtual" },
 ];
 
