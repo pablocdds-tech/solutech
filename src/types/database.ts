@@ -908,3 +908,66 @@ export interface ReconciliationMatch {
 export type OfxImportInsert = Omit<OfxImport, "id" | "created_at" | "updated_at" | "total_lines" | "matched_lines" | "ignored_lines" | "pending_lines" | "imported_at"> & { id?: string };
 
 export type OfxLineInsert = Omit<OfxLine, "id" | "created_at" | "updated_at"> & { id?: string };
+
+// === Tabelas FASE 9 — Vendas & Recebíveis ===
+
+export interface Sale {
+  id: string;
+  org_id: string;
+  store_id: string;
+  status: import("./index").SaleStatus;
+  sale_date: string;
+  sales_channel_id: string | null;
+  subtotal: number;
+  discount: number;
+  total_amount: number;
+  customer_name: string | null;
+  customer_doc: string | null;
+  external_id: string | null;
+  notes: string | null;
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SaleItem {
+  id: string;
+  org_id: string;
+  sale_id: string;
+  item_id: string;
+  quantity: number;
+  unit_price: number;
+  discount: number;
+  total_price: number;
+  unit_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SalePayment {
+  id: string;
+  org_id: string;
+  sale_id: string;
+  payment_method_id: string | null;
+  amount: number;
+  installments: number;
+  days_to_receive: number;
+  notes: string | null;
+  created_at: string;
+}
+
+export type SaleInsert = Omit<
+  Sale,
+  "id" | "created_at" | "updated_at" | "confirmed_at" | "confirmed_by" | "cancelled_at" | "cancelled_by" | "subtotal" | "total_amount"
+> & { id?: string };
+
+export type SaleItemInsert = Omit<SaleItem, "id" | "created_at" | "updated_at" | "total_price"> & { id?: string };
+
+export type SalePaymentInsert = Omit<SalePayment, "id" | "created_at"> & { id?: string };

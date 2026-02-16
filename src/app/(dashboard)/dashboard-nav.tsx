@@ -8,6 +8,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/cadastros", label: "Cadastros" },
   { href: "/compras", label: "Compras / NF" },
+  { href: "/vendas", label: "Vendas" },
   { href: "/financeiro", label: "Financeiro" },
   { href: "/estoque", label: "Estoque" },
   { href: "/producao", label: "Produção" },

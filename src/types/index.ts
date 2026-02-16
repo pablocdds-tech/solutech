@@ -124,6 +124,9 @@ export type OfxLineStatus = "pending" | "matched" | "split" | "ignored" | "creat
 // === Tipo de Match de Conciliação ===
 export type ReconciliationMatchType = "link" | "create" | "split" | "ignore";
 
+// === Status de Venda ===
+export type SaleStatus = "draft" | "confirmed" | "cancelled";
+
 // === Paginação ===
 export interface PaginationParams {
   page: number;
