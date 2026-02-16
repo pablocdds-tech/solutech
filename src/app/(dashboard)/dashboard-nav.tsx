@@ -10,6 +10,7 @@ const navItems = [
   { href: "/compras", label: "Compras / NF" },
   { href: "/financeiro", label: "Financeiro" },
   { href: "/estoque", label: "Estoque" },
+  { href: "/producao", label: "Produção" },
   { href: "/cd-loja", label: "CD → Loja" },
   { href: "/banco-virtual", label: "Banco Virtual" },
 ];

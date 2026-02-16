@@ -112,6 +112,9 @@ export type CashSessionStatus = "open" | "closed";
 // === Status de Pedido Interno (CD→Loja) ===
 export type InternalOrderStatus = "draft" | "confirmed" | "cancelled";
 
+// === Status de Ordem de Produção ===
+export type ProductionOrderStatus = "draft" | "in_progress" | "finalized" | "cancelled";
+
 // === Paginação ===
 export interface PaginationParams {
   page: number;

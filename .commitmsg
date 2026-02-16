@@ -1,15 +1,15 @@
-FASE 6: CD→Loja + Banco Virtual (fluxo completo)
+FASE 7: Produção + Custo Real + CMV (M4 profundo)
 
-- Tabelas: internal_orders, internal_order_items
-- Enum: internal_order_status (draft, confirmed, cancelled)
-- fn_confirm_internal_order: atomica + idempotente (OUT CD + IN loja + DEBIT ledger + audit)
-- fn_settle_virtual_balance: atomica (bank_tx DEBIT + CREDIT ledger + baixa AP + audit)
-- fn_adjust_virtual_balance_admin: ajuste excepcional com audit CRITICAL (somente admins)
-- RLS: org_id para pedidos internos e itens
-- Action Catalog: createInternalOrder, addInternalOrderItem, removeInternalOrderItem,
-  confirmInternalOrder, settleVirtualBalance, adjustVirtualBalanceAdmin,
-  listInternalOrders, getInternalOrder, getInternalOrderItems
-- Types: InternalOrder, InternalOrderItem + Insert types
-- Paginas: /cd-loja (listagem + criar), /cd-loja/[id] (detalhe + confirmar),
-  /cd-loja/liquidar (liquidar banco virtual com pagamento real)
-- Nav: CD→Loja adicionado ao sidebar
+- Tabelas: recipes, recipe_items, production_orders, production_consumptions, production_losses
+- Enum: production_order_status (draft, in_progress, finalized, cancelled)
+- fn_finalize_production_order: atomica + idempotente (OUT insumos + OUT perdas + IN produto acabado + custo real)
+- fn_compute_cmv_for_period: CMV derivado, nunca digitado
+- View: v_cmv_by_period (CMV por período/loja/item)
+- RLS: org_id para todas as tabelas; consumos e perdas imutáveis (SELECT + INSERT)
+- Action Catalog: createRecipe, addRecipeItem, removeRecipeItem, createProductionOrder,
+  startProductionOrder, registerConsumption, registerLoss, finalizeProductionOrder, computeCmv
+- Types: Recipe, RecipeItem, ProductionOrder, ProductionConsumption, ProductionLoss, CmvResult
+- Páginas: /producao (hub), /producao/fichas (receitas), /producao/fichas/[id] (detalhe),
+  /producao/ordens (lista), /producao/ordens/[id] (detalhe + consumir + finalizar),
+  /producao/cmv (CMV derivado)
+- Nav: Produção adicionado ao sidebar

@@ -728,3 +728,114 @@ export type InternalOrderInsert = Omit<
 export type InternalOrderItemInsert = Omit<InternalOrderItem, "id" | "created_at" | "updated_at" | "total_cost"> & {
   id?: string;
 };
+
+// === Tabelas FASE 7 — Produção + Custo Real + CMV ===
+
+export interface Recipe {
+  id: string;
+  org_id: string;
+  store_id: string | null;
+  name: string;
+  description: string | null;
+  output_item_id: string;
+  output_quantity: number;
+  output_unit_id: string | null;
+  is_active: boolean;
+  notes: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecipeItem {
+  id: string;
+  org_id: string;
+  recipe_id: string;
+  item_id: string;
+  quantity: number;
+  unit_id: string | null;
+  loss_percentage: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductionOrder {
+  id: string;
+  org_id: string;
+  store_id: string;
+  recipe_id: string;
+  status: import("./index").ProductionOrderStatus;
+  planned_quantity: number;
+  actual_quantity: number | null;
+  planned_date: string;
+  total_input_cost: number;
+  total_loss_cost: number;
+  real_unit_cost: number;
+  notes: string | null;
+  started_at: string | null;
+  started_by: string | null;
+  finalized_at: string | null;
+  finalized_by: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductionConsumption {
+  id: string;
+  org_id: string;
+  production_order_id: string;
+  item_id: string;
+  quantity: number;
+  unit_cost: number;
+  total_cost: number;
+  unit_id: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface ProductionLoss {
+  id: string;
+  org_id: string;
+  production_order_id: string;
+  item_id: string;
+  quantity: number;
+  unit_cost: number;
+  total_cost: number;
+  unit_id: string | null;
+  reason: string | null;
+  reason_id: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface CmvResult {
+  store_id: string;
+  item_id: string;
+  cmv_total: number;
+  qty_out: number;
+  loss_total: number;
+  total_cost: number;
+}
+
+export type RecipeInsert = Omit<Recipe, "id" | "created_at" | "updated_at"> & { id?: string };
+
+export type RecipeItemInsert = Omit<RecipeItem, "id" | "created_at" | "updated_at"> & { id?: string };
+
+export type ProductionOrderInsert = Omit<
+  ProductionOrder,
+  "id" | "created_at" | "updated_at" | "actual_quantity" | "total_input_cost" | "total_loss_cost" | "real_unit_cost" | "started_at" | "started_by" | "finalized_at" | "finalized_by" | "cancelled_at" | "cancelled_by"
+> & { id?: string };
+
+export type ProductionConsumptionInsert = Omit<ProductionConsumption, "id" | "created_at" | "total_cost"> & { id?: string };
+
+export type ProductionLossInsert = Omit<ProductionLoss, "id" | "created_at" | "total_cost"> & { id?: string };
