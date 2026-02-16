@@ -19,6 +19,7 @@ const navItems = [
   { href: "/checklists", label: "Checklists" },
   { href: "/notificacoes", label: "Notificações" },
   { href: "/relatorios", label: "Relatórios" },
+  { href: "/ia-executora", label: "IA Executora" },
 ];
 
 export function DashboardNav() {

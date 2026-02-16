@@ -1111,3 +1111,59 @@ export type InventoryCountItemInsert = Omit<InventoryCountItem, "id" | "created_
 export type ChecklistTemplateInsert = Omit<ChecklistTemplate, "id" | "created_at" | "updated_at"> & { id?: string };
 
 export type ChecklistTaskInsert = Omit<ChecklistTask, "id" | "created_at" | "updated_at" | "total_items" | "completed_items" | "nok_items" | "score_pct" | "started_at" | "completed_at" | "completed_by"> & { id?: string };
+
+// === Tabelas — IA Executora ===
+
+export interface AiTask {
+  id: string;
+  org_id: string;
+  store_id: string | null;
+  status: import("./index").AiTaskStatus;
+  title: string;
+  description: string | null;
+  intent: string;
+  context: Record<string, unknown> | null;
+  plan_summary: string | null;
+  total_steps: number;
+  completed_steps: number;
+  failed_steps: number;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  error_message: string | null;
+  ai_model: string | null;
+  ai_session_id: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AiTaskStep {
+  id: string;
+  org_id: string;
+  ai_task_id: string;
+  step_order: number;
+  status: import("./index").AiStepStatus;
+  action_catalog: string;
+  action_params: Record<string, unknown>;
+  description: string;
+  result: Record<string, unknown> | null;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_ms: number | null;
+  created_records: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AiTaskInsert = Omit<
+  AiTask,
+  "id" | "created_at" | "updated_at" | "total_steps" | "completed_steps" | "failed_steps" | "reviewed_by" | "reviewed_at" | "review_notes" | "started_at" | "completed_at" | "error_message"
+> & { id?: string };
+
+export type AiTaskStepInsert = Omit<AiTaskStep, "id" | "created_at" | "updated_at" | "result" | "error_message" | "started_at" | "completed_at" | "duration_ms" | "created_records"> & { id?: string };

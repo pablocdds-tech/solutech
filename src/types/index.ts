@@ -142,6 +142,20 @@ export type NotificationChannel = "inbox" | "email" | "whatsapp";
 // === Prioridade de Notificação ===
 export type NotificationPriority = "low" | "normal" | "high" | "critical";
 
+// === Status de Tarefa IA ===
+export type AiTaskStatus =
+  | "planning"
+  | "pending_review"
+  | "approved"
+  | "executing"
+  | "completed"
+  | "failed"
+  | "rejected"
+  | "cancelled";
+
+// === Status de Step da IA ===
+export type AiStepStatus = "pending" | "executing" | "completed" | "failed" | "skipped";
+
 // === Paginação ===
 export interface PaginationParams {
   page: number;
