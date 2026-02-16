@@ -1,14 +1,18 @@
-FASE 3: Estoque base + Banco Virtual (M4 + M1 estrutural)
+FASE 4: NF/Compras com Action Catalog (M3)
 
-- inventory_moves (SSOT): tabela imutavel com move_type IN/OUT/ADJUST
-- virtual_ledger_entries (SSOT): tabela imutavel com entry_type DEBIT/CREDIT/ADJUST
-- v_inventory_balance: view derivada com saldo por loja/item e custo medio
-- v_virtual_ledger_balance: view derivada com saldo virtual por loja
-- get_virtual_ledger_statement: RPC com saldo acumulado
-- RLS: SELECT + INSERT apenas (sem UPDATE/DELETE = imutavel)
-- Server Actions: getInventoryBalance, listInventoryMoves, createAdjustmentMove
-- Server Actions: getVirtualLedgerBalances, getVirtualLedgerStatement, createVirtualLedgerAdjustment
-- Paginas: /estoque, /estoque/movimentos, /banco-virtual, /banco-virtual/extrato/[storeId]
-- Componentes: InventoryBalanceView, InventoryMovesView, VirtualBalanceView, LedgerStatementView
-- Button: adicionada variant outline
-- Nav: Estoque e Banco Virtual adicionados ao sidebar
+- Tabelas: receivings, receiving_items, receiving_payments, ap_payables
+- Enums: receiving_status, receiving_item_match, payable_status
+- fn_confirm_receiving: funcao atomica e idempotente (estoque IN + AP + audit)
+- fn_cancel_receiving_draft: cancelar rascunho com audit
+- fn_validate_receiving_draft: validar draft antes de confirmar
+- Uniques anti-duplicidade: invoice_key ou (supplier+number+date)
+- RLS: org_id + store_access para ap_payables
+- Action Catalog completo: createReceivingDraft, updateReceivingHeader,
+  addReceivingItem, resolveLineItemMatch, ignoreLineItem, removeReceivingItem,
+  setPaymentPlan, validateReceivingDraft, confirmReceiving, cancelReceivingDraft,
+  uploadDocument, listReceivings, getReceiving, getReceivingItems,
+  getReceivingPayments, listApPayables
+- Types: Receiving, ReceivingItem, ReceivingPayment, ApPayable + Insert types
+- Paginas: /compras (listagem), /compras/novo (formulario), /compras/[id] (detalhe)
+- UI completa: fluxo draft -> itens -> match -> pagamento -> validar -> confirmar
+- Nav: Compras/NF adicionado ao sidebar

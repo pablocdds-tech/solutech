@@ -355,6 +355,96 @@ export interface VirtualLedgerStatement {
   running_balance: number;
 }
 
+// === Tabelas FASE 4 — Compras / NF (M3) ===
+
+export interface Receiving {
+  id: string;
+  org_id: string;
+  store_id: string;
+  billed_store_id: string;
+  supplier_id: string | null;
+  status: import("./index").ReceivingStatus;
+  invoice_key: string | null;
+  invoice_number: string | null;
+  invoice_series: string | null;
+  invoice_date: string | null;
+  total_products: number;
+  freight_amount: number;
+  discount_amount: number;
+  other_costs: number;
+  total_amount: number;
+  notes: string | null;
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReceivingItem {
+  id: string;
+  org_id: string;
+  receiving_id: string;
+  supplier_item_code: string | null;
+  supplier_item_name: string;
+  ncm: string | null;
+  cfop: string | null;
+  quantity: number;
+  unit_cost: number;
+  total_cost: number;
+  discount: number;
+  item_id: string | null;
+  unit_id: string | null;
+  matched_status: import("./index").ReceivingItemMatch;
+  ai_confidence: number | null;
+  ai_suggested_item: Record<string, unknown> | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReceivingPayment {
+  id: string;
+  org_id: string;
+  receiving_id: string;
+  installment: number;
+  due_date: string;
+  amount: number;
+  payment_method_id: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface ApPayable {
+  id: string;
+  org_id: string;
+  store_id: string;
+  supplier_id: string | null;
+  receiving_id: string | null;
+  status: import("./index").PayableStatus;
+  description: string;
+  amount: number;
+  paid_amount: number;
+  due_date: string;
+  paid_at: string | null;
+  payment_method_id: string | null;
+  finance_category_id: string | null;
+  cost_center_id: string | null;
+  bank_transaction_id: string | null;
+  installment: number;
+  total_installments: number;
+  notes: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // === Tipos para INSERT (sem campos auto-gerados) ===
 
 export type OrgInsert = Omit<Org, "id" | "created_at" | "updated_at"> & {
@@ -475,5 +565,22 @@ export type InventoryMoveInsert = Omit<InventoryMove, "id" | "created_at" | "tot
   id?: string;
 };
 export type VirtualLedgerEntryInsert = Omit<VirtualLedgerEntry, "id" | "created_at"> & {
+  id?: string;
+};
+
+export type ReceivingInsert = Omit<
+  Receiving,
+  "id" | "created_at" | "updated_at" | "confirmed_at" | "confirmed_by" | "cancelled_at" | "cancelled_by"
+> & { id?: string };
+
+export type ReceivingItemInsert = Omit<ReceivingItem, "id" | "created_at" | "updated_at" | "total_cost"> & {
+  id?: string;
+};
+
+export type ReceivingPaymentInsert = Omit<ReceivingPayment, "id" | "created_at"> & {
+  id?: string;
+};
+
+export type ApPayableInsert = Omit<ApPayable, "id" | "created_at" | "updated_at"> & {
   id?: string;
 };

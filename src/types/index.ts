@@ -91,6 +91,15 @@ export type AdjustmentDirection = "positive" | "negative" | "both";
 // === Tipo de Conta Bancária ===
 export type BankAccountType = "checking" | "savings" | "investment";
 
+// === Status de Recebimento (NF) ===
+export type ReceivingStatus = "draft" | "confirmed" | "cancelled";
+
+// === Status de Match de Item no Recebimento ===
+export type ReceivingItemMatch = "pending" | "matched" | "created" | "ignored";
+
+// === Status de Conta a Pagar ===
+export type PayableStatus = "pending" | "partial" | "paid" | "cancelled";
+
 // === Paginação ===
 export interface PaginationParams {
   page: number;
