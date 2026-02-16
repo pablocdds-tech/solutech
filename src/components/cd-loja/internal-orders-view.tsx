@@ -3,9 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { listInternalOrders, createInternalOrder } from "@/actions/cd-loja";
-import type { InternalOrder } from "@/types/database";
-import { DataTable, type Column } from "@/components/ui/data-table";
+import {
+  listInternalOrders,
+  createInternalOrder,
+  type InternalOrderWithStoreNames,
+} from "@/actions/cd-loja";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,17 +15,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
-const statusConfig: Record<string, { label: string; variant: "default" | "success" | "warning" | "danger" | "info" }> = {
+const statusConfig: Record<
+  string,
+  { label: string; variant: "default" | "success" | "warning" | "danger" }
+> = {
   draft: { label: "Rascunho", variant: "warning" },
   confirmed: { label: "Confirmado", variant: "success" },
   cancelled: { label: "Cancelado", variant: "danger" },
-};
-
-const sourceTypeLabels: Record<string, string> = {
-  user: "Manual",
-  ai: "IA",
-  system: "Sistema",
-  import: "Importação",
 };
 
 interface StoreOption {
@@ -34,7 +32,7 @@ interface StoreOption {
 
 export function InternalOrdersView() {
   const router = useRouter();
-  const [data, setData] = React.useState<InternalOrder[]>([]);
+  const [data, setData] = React.useState<InternalOrderWithStoreNames[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
@@ -51,6 +49,7 @@ export function InternalOrdersView() {
 
   const loadData = React.useCallback(async () => {
     setLoading(true);
+    setError(null);
     const opts: { status?: string } = {};
     if (statusFilter !== "all") opts.status = statusFilter;
     const result = await listInternalOrders(opts);
@@ -105,74 +104,23 @@ export function InternalOrdersView() {
     setActionLoading(false);
   }
 
-  const columns: Column<InternalOrder & Record<string, unknown>>[] = [
-    {
-      key: "created_at",
-      header: "Criado em",
-      render: (row) => (
-        <span className="text-sm text-slate-700">
-          {formatDate(row.created_at)}
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      header: "Status",
-      render: (row) => {
-        const cfg =
-          statusConfig[row.status] ?? {
-            label: row.status,
-            variant: "default" as const,
-          };
-        return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
-      },
-    },
-    {
-      key: "order_date",
-      header: "Data Pedido",
-      render: (row) => (
-        <span className="text-sm text-slate-700">
-          {formatDate(row.order_date)}
-        </span>
-      ),
-    },
-    {
-      key: "total_amount",
-      header: "Valor Total",
-      className: "text-right",
-      render: (row) => (
-        <span className="text-right font-medium text-slate-900">
-          {formatCurrency(Number(row.total_amount))}
-        </span>
-      ),
-    },
-    {
-      key: "source_type",
-      header: "Origem",
-      render: (row) => (
-        <Badge variant="info">
-          {sourceTypeLabels[row.source_type] ?? row.source_type}
-        </Badge>
-      ),
-    },
-  ];
-
   const draftsCount = data.filter((r) => r.status === "draft").length;
   const confirmedCount = data.filter((r) => r.status === "confirmed").length;
   const totalConfirmado = data
     .filter((r) => r.status === "confirmed")
     .reduce((acc, r) => acc + Number(r.total_amount), 0);
 
-  if (error && !showCreateForm) {
-    return (
-      <div className="rounded-lg border border-danger/20 bg-danger/5 p-4 text-sm text-danger">
-        {error}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+          <button onClick={() => setError(null)} className="ml-2 underline">
+            Fechar
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           {(["all", "draft", "confirmed", "cancelled"] as const).map((s) => (
@@ -185,9 +133,7 @@ export function InternalOrdersView() {
                   : "bg-slate-100 text-slate-700 hover:bg-slate-200"
               }`}
             >
-              {s === "all"
-                ? "Todos"
-                : statusConfig[s]?.label ?? s}
+              {s === "all" ? "Todos" : statusConfig[s]?.label ?? s}
             </button>
           ))}
         </div>
@@ -202,36 +148,26 @@ export function InternalOrdersView() {
             size="sm"
             onClick={() => setShowCreateForm(!showCreateForm)}
           >
-            Novo Pedido
+            {showCreateForm ? "Fechar" : "Novo Pedido"}
           </Button>
         </div>
       </div>
 
+      {/* Create form */}
       {showCreateForm && (
         <div className="rounded-xl border border-primary-200 bg-primary-50/50 p-6 space-y-4">
           <h3 className="text-lg font-semibold text-slate-900">
-            Novo Pedido Interno
+            Novo Pedido CD → Loja
           </h3>
-          {error && (
-            <div className="rounded-lg border border-danger/20 bg-danger/5 p-3 text-sm text-danger">
-              {error}
-              <button
-                onClick={() => setError(null)}
-                className="ml-2 underline"
-              >
-                Fechar
-              </button>
-            </div>
-          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="w-full">
               <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Loja Origem (CD)
+                Origem (CD)
               </label>
               <select
                 value={newSourceStoreId}
                 onChange={(e) => setNewSourceStoreId(e.target.value)}
-                className="flex h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
               >
                 <option value="">Selecione o CD</option>
                 {cdStores.map((s) => (
@@ -243,12 +179,12 @@ export function InternalOrdersView() {
             </div>
             <div className="w-full">
               <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Loja Destino
+                Destino (Loja)
               </label>
               <select
                 value={newDestStoreId}
                 onChange={(e) => setNewDestStoreId(e.target.value)}
-                className="flex h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
               >
                 <option value="">Selecione a loja</option>
                 {lojaStores.map((s) => (
@@ -285,7 +221,7 @@ export function InternalOrdersView() {
               Criar Pedido
             </Button>
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={() => setShowCreateForm(false)}
             >
@@ -295,22 +231,23 @@ export function InternalOrdersView() {
         </div>
       )}
 
+      {/* Summary cards */}
       {!loading && data.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-lg border border-slate-200 bg-white p-4">
             <p className="text-sm text-slate-600">Rascunhos</p>
-            <p className="mt-1 text-2xl font-semibold text-warning">
+            <p className="mt-1 text-2xl font-semibold text-amber-600">
               {draftsCount}
             </p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-4">
             <p className="text-sm text-slate-600">Confirmados</p>
-            <p className="mt-1 text-2xl font-semibold text-success">
+            <p className="mt-1 text-2xl font-semibold text-green-600">
               {confirmedCount}
             </p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <p className="text-sm text-slate-600">Total valor confirmado</p>
+            <p className="text-sm text-slate-600">Total confirmado</p>
             <p className="mt-1 text-2xl font-semibold text-slate-900">
               {formatCurrency(totalConfirmado)}
             </p>
@@ -318,14 +255,78 @@ export function InternalOrdersView() {
         </div>
       )}
 
-      <DataTable
-        columns={columns}
-        data={data as (InternalOrder & Record<string, unknown>)[]}
-        loading={loading}
-        emptyMessage="Nenhum pedido interno encontrado."
-        getRowKey={(row) => row.id}
-        onRowClick={(row) => router.push(`/cd-loja/${row.id}`)}
-      />
+      {/* Orders table */}
+      <div className="rounded-lg border border-slate-200 overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center text-slate-500">Carregando...</div>
+        ) : data.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-slate-500">Nenhum pedido encontrado.</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Clique em &quot;Novo Pedido&quot; para criar o primeiro.
+            </p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="text-left px-4 py-3 font-medium text-slate-700">
+                  Data
+                </th>
+                <th className="text-left px-4 py-3 font-medium text-slate-700">
+                  Origem
+                </th>
+                <th className="text-left px-4 py-3 font-medium text-slate-700">
+                  Destino
+                </th>
+                <th className="text-left px-4 py-3 font-medium text-slate-700">
+                  Status
+                </th>
+                <th className="text-center px-4 py-3 font-medium text-slate-700">
+                  Itens
+                </th>
+                <th className="text-right px-4 py-3 font-medium text-slate-700">
+                  Total
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((order) => {
+                const cfg = statusConfig[order.status] ?? {
+                  label: order.status,
+                  variant: "default" as const,
+                };
+                return (
+                  <tr
+                    key={order.id}
+                    onClick={() => router.push(`/cd-loja/${order.id}`)}
+                    className="border-b border-slate-100 hover:bg-primary-50/50 cursor-pointer transition-colors"
+                  >
+                    <td className="px-4 py-3 text-slate-700">
+                      {formatDate(order.order_date)}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-900">
+                      {order.source_store_name}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-900">
+                      {order.destination_store_name}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-center text-slate-600">
+                      {order.items_count}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                      {formatCurrency(Number(order.total_amount))}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

@@ -7,12 +7,15 @@ import {
   getInternalOrderItems,
   addInternalOrderItem,
   removeInternalOrderItem,
+  updateInternalOrderItem,
   confirmInternalOrder,
+  cancelInternalOrder,
+  getItemPriceForStore,
+  type InternalOrderWithStoreNames,
+  type InternalOrderItemWithName,
 } from "@/actions/cd-loja";
-import type { InternalOrder, InternalOrderItem } from "@/types/database";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
@@ -23,6 +26,7 @@ interface Props {
 interface CatalogItem {
   id: string;
   name: string;
+  type: string;
 }
 
 const statusConfig: Record<
@@ -35,16 +39,24 @@ const statusConfig: Record<
 };
 
 export function InternalOrderDetailView({ orderId }: Props) {
-  const [order, setOrder] = React.useState<InternalOrder | null>(null);
-  const [items, setItems] = React.useState<InternalOrderItem[]>([]);
+  const [order, setOrder] = React.useState<InternalOrderWithStoreNames | null>(null);
+  const [items, setItems] = React.useState<InternalOrderItemWithName[]>([]);
   const [catalogItems, setCatalogItems] = React.useState<CatalogItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [success, setSuccess] = React.useState<string | null>(null);
   const [actionLoading, setActionLoading] = React.useState(false);
 
+  // Add item form
   const [newItemId, setNewItemId] = React.useState("");
-  const [newQuantity, setNewQuantity] = React.useState("");
-  const [newUnitCost, setNewUnitCost] = React.useState("");
+  const [newQuantity, setNewQuantity] = React.useState("1");
+  const [newUnitPrice, setNewUnitPrice] = React.useState("");
+  const [newNotes, setNewNotes] = React.useState("");
+  const [priceLoading, setPriceLoading] = React.useState(false);
+
+  // Edit qty inline
+  const [editingItemId, setEditingItemId] = React.useState<string | null>(null);
+  const [editQty, setEditQty] = React.useState("");
 
   const loadData = React.useCallback(async () => {
     setLoading(true);
@@ -57,7 +69,7 @@ export function InternalOrderDetailView({ orderId }: Props) {
     if (orderRes.success && orderRes.data) {
       setOrder(orderRes.data);
     } else {
-      setError(orderRes.error ?? "Erro ao carregar pedido.");
+      setError(orderRes.error ?? "Pedido não encontrado.");
     }
 
     if (itemsRes.success && itemsRes.data) {
@@ -67,7 +79,7 @@ export function InternalOrderDetailView({ orderId }: Props) {
     const supabase = createClient();
     const { data: catData } = await supabase
       .from("items")
-      .select("id, name")
+      .select("id, name, type")
       .eq("is_active", true)
       .order("name");
     if (catData) setCatalogItems(catData as CatalogItem[]);
@@ -80,27 +92,48 @@ export function InternalOrderDetailView({ orderId }: Props) {
   }, [loadData]);
 
   const isDraft = order?.status === "draft";
-  const itemMap = React.useMemo(() => {
-    const m: Record<string, string> = {};
-    catalogItems.forEach((c) => (m[c.id] = c.name));
-    return m;
-  }, [catalogItems]);
+
+  // Buscar preço ao selecionar item
+  const handleItemSelect = React.useCallback(
+    async (itemId: string) => {
+      setNewItemId(itemId);
+      if (!itemId || !order) {
+        setNewUnitPrice("");
+        return;
+      }
+
+      setPriceLoading(true);
+      const res = await getItemPriceForStore(itemId, order.destination_store_id);
+      if (res.success && res.data) {
+        const price = res.data.costPrice ?? res.data.price;
+        setNewUnitPrice(price > 0 ? price.toString() : "");
+      }
+      setPriceLoading(false);
+    },
+    [order]
+  );
 
   async function handleAddItem() {
-    if (!newItemId || !newQuantity || !newUnitCost) return;
+    if (!newItemId || !newQuantity || !newUnitPrice) return;
     const qty = parseFloat(newQuantity);
-    const cost = parseFloat(newUnitCost);
-    if (isNaN(qty) || qty <= 0 || isNaN(cost) || cost < 0) return;
+    const price = parseFloat(newUnitPrice);
+    if (isNaN(qty) || qty <= 0 || isNaN(price) || price < 0) return;
+
     setActionLoading(true);
+    setError(null);
     const result = await addInternalOrderItem(orderId, {
       itemId: newItemId,
       quantity: qty,
-      unitCost: cost,
+      unitCost: price,
+      notes: newNotes || undefined,
     });
     if (result.success) {
       setNewItemId("");
-      setNewQuantity("");
-      setNewUnitCost("");
+      setNewQuantity("1");
+      setNewUnitPrice("");
+      setNewNotes("");
+      setSuccess("Item adicionado");
+      setTimeout(() => setSuccess(null), 2000);
       await loadData();
     } else {
       setError(result.error ?? "Erro ao adicionar item");
@@ -110,6 +143,7 @@ export function InternalOrderDetailView({ orderId }: Props) {
 
   async function handleRemoveItem(itemId: string) {
     setActionLoading(true);
+    setError(null);
     const result = await removeInternalOrderItem(itemId);
     if (result.success) {
       await loadData();
@@ -119,14 +153,46 @@ export function InternalOrderDetailView({ orderId }: Props) {
     setActionLoading(false);
   }
 
+  async function handleSaveQty(itemId: string) {
+    const qty = parseFloat(editQty);
+    if (isNaN(qty) || qty <= 0) return;
+    setActionLoading(true);
+    const result = await updateInternalOrderItem(itemId, { quantity: qty });
+    if (result.success) {
+      setEditingItemId(null);
+      await loadData();
+    } else {
+      setError(result.error ?? "Erro ao atualizar");
+    }
+    setActionLoading(false);
+  }
+
   async function handleConfirm() {
+    if (items.length === 0) {
+      setError("Adicione pelo menos 1 item antes de confirmar");
+      return;
+    }
     setActionLoading(true);
     setError(null);
     const result = await confirmInternalOrder(orderId);
     if (result.success) {
+      setSuccess("Pedido confirmado! Estoque transferido + débito virtual gerado.");
       await loadData();
     } else {
       setError(result.error ?? "Erro ao confirmar pedido");
+    }
+    setActionLoading(false);
+  }
+
+  async function handleCancel() {
+    setActionLoading(true);
+    setError(null);
+    const result = await cancelInternalOrder(orderId);
+    if (result.success) {
+      setSuccess("Pedido cancelado.");
+      await loadData();
+    } else {
+      setError(result.error ?? "Erro ao cancelar");
     }
     setActionLoading(false);
   }
@@ -149,252 +215,370 @@ export function InternalOrderDetailView({ orderId }: Props) {
 
   if (!order) {
     return (
-      <div className="rounded-lg border border-danger/20 bg-danger/5 p-4 text-sm text-danger">
-        Pedido não encontrado.
+      <div className="space-y-4">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          Pedido não encontrado. {error}
+        </div>
+        <Link href="/cd-loja">
+          <Button variant="outline" size="sm">&larr; Voltar</Button>
+        </Link>
       </div>
     );
   }
 
-  const itemsTotal = items.reduce(
-    (sum, it) => sum + Number(it.total_cost),
-    0
-  );
+  const itemsTotal = items.reduce((sum, it) => sum + Number(it.total_cost), 0);
+
+  // Itens já adicionados (para evitar duplicatas no select)
+  const addedItemIds = new Set(items.map((i) => i.item_id));
+  const availableItems = catalogItems.filter((c) => !addedItemIds.has(c.id));
+
+  const newLineTotal =
+    (parseFloat(newQuantity) || 0) * (parseFloat(newUnitPrice) || 0);
 
   return (
     <div className="space-y-6">
+      {/* Messages */}
       {error && (
-        <div className="rounded-lg border border-danger/20 bg-danger/5 p-4 text-sm text-danger">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error}
-          <button
-            onClick={() => setError(null)}
-            className="ml-2 underline"
-          >
+          <button onClick={() => setError(null)} className="ml-2 underline">
             Fechar
           </button>
+        </div>
+      )}
+      {success && (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+          {success}
         </div>
       )}
 
       <Link href="/cd-loja">
         <Button variant="outline" size="sm">
-          &larr; Voltar
+          &larr; Voltar para lista
         </Button>
       </Link>
 
       {/* Header card */}
       <div className="rounded-xl border border-slate-200 bg-white p-6">
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-slate-900">
-              Pedido Interno
-            </h2>
-            <div className="mt-1 flex items-center gap-3">
-              <Badge
-                variant={
-                  statusConfig[order.status]?.variant ?? "default"
-                }
-              >
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold text-slate-900">
+                Pedido Interno
+              </h2>
+              <Badge variant={statusConfig[order.status]?.variant ?? "default"}>
                 {statusConfig[order.status]?.label ?? order.status}
               </Badge>
-              <span className="text-sm text-slate-600">
-                Data: {formatDate(order.order_date)}
-              </span>
             </div>
+            <div className="mt-2 grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
+              <div>
+                <span className="text-slate-500">Origem:</span>{" "}
+                <span className="font-medium text-slate-900">
+                  {order.source_store_name}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500">Destino:</span>{" "}
+                <span className="font-medium text-slate-900">
+                  {order.destination_store_name}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500">Data:</span>{" "}
+                <span className="text-slate-700">
+                  {formatDate(order.order_date)}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500">Itens:</span>{" "}
+                <span className="text-slate-700">{items.length}</span>
+              </div>
+            </div>
+            {order.notes && (
+              <p className="mt-2 text-sm text-slate-600 italic">
+                {order.notes}
+              </p>
+            )}
           </div>
-          <p className="text-2xl font-bold text-slate-900">
-            {formatCurrency(Number(order.total_amount))}
-          </p>
+          <div className="text-right">
+            <p className="text-sm text-slate-500">Total</p>
+            <p className="text-3xl font-bold text-slate-900">
+              {formatCurrency(itemsTotal)}
+            </p>
+          </div>
         </div>
-        {order.notes && (
-          <p className="mt-3 text-sm text-slate-600">{order.notes}</p>
-        )}
       </div>
 
-      {/* Confirmed banner */}
+      {/* Status banners */}
       {order.status === "confirmed" && (
-        <div className="rounded-xl border-2 border-success/50 bg-success/5 p-6">
-          <h3 className="text-lg font-semibold text-success">
+        <div className="rounded-xl border-2 border-green-300 bg-green-50 p-5">
+          <h3 className="text-base font-semibold text-green-800">
             Pedido Confirmado
           </h3>
-          <p className="mt-1 text-sm text-slate-700">
-            Confirmado em{" "}
-            {order.confirmed_at
-              ? formatDate(order.confirmed_at)
-              : "—"}
+          <p className="mt-1 text-sm text-green-700">
+            Estoque transferido do CD para a loja. Débito virtual gerado.
+            {order.confirmed_at && ` Confirmado em ${formatDate(order.confirmed_at)}`}
           </p>
         </div>
       )}
-
-      {/* Cancelled banner */}
       {order.status === "cancelled" && (
-        <div className="rounded-xl border-2 border-danger/50 bg-danger/5 p-6">
-          <h3 className="text-lg font-semibold text-danger">
+        <div className="rounded-xl border-2 border-red-300 bg-red-50 p-5">
+          <h3 className="text-base font-semibold text-red-800">
             Pedido Cancelado
           </h3>
-          <p className="mt-1 text-sm text-slate-700">
-            Cancelado em{" "}
-            {order.cancelled_at
-              ? formatDate(order.cancelled_at)
-              : "—"}
-          </p>
+          {order.cancelled_at && (
+            <p className="mt-1 text-sm text-red-700">
+              Cancelado em {formatDate(order.cancelled_at)}
+            </p>
+          )}
         </div>
       )}
 
-      {/* Items section */}
-      <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
-        <h3 className="text-lg font-semibold text-slate-900">
-          Itens ({items.length})
-        </h3>
-
-        {isDraft && (
-          <div className="rounded-lg border border-primary-200 bg-primary-50/50 p-4 space-y-3">
-            <h4 className="text-sm font-medium text-slate-900">
-              Adicionar Item
-            </h4>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="w-full">
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Item
-                </label>
-                <select
-                  value={newItemId}
-                  onChange={(e) => setNewItemId(e.target.value)}
-                  className="flex h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                >
-                  <option value="">Selecione...</option>
-                  {catalogItems.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <Input
-                label="Quantidade"
+      {/* Add item form (only if draft) */}
+      {isDraft && (
+        <div className="rounded-xl border border-primary-200 bg-primary-50/30 p-5 space-y-4">
+          <h3 className="text-base font-semibold text-slate-900">
+            Adicionar Item
+          </h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            <div className="lg:col-span-2">
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                Item
+              </label>
+              <select
+                value={newItemId}
+                onChange={(e) => handleItemSelect(e.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+              >
+                <option value="">Selecione um item...</option>
+                {availableItems.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.type})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                Quantidade
+              </label>
+              <input
                 type="number"
-                step="0.0001"
-                min="0"
+                step="0.01"
+                min="0.01"
                 value={newQuantity}
                 onChange={(e) => setNewQuantity(e.target.value)}
-                placeholder="0"
+                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
               />
-              <Input
-                label="Custo Unit."
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                Preço Unit. (R$)
+                {priceLoading && (
+                  <span className="ml-1 text-primary-500">buscando...</span>
+                )}
+              </label>
+              <input
                 type="number"
                 step="0.01"
                 min="0"
-                value={newUnitCost}
-                onChange={(e) => setNewUnitCost(e.target.value)}
-                placeholder="0,00"
+                value={newUnitPrice}
+                onChange={(e) => setNewUnitPrice(e.target.value)}
+                placeholder={priceLoading ? "..." : "0,00"}
+                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm"
               />
-              <div className="flex items-end">
-                <Button
-                  size="sm"
-                  onClick={handleAddItem}
-                  loading={actionLoading}
-                  disabled={
-                    !newItemId || !newQuantity || !newUnitCost
-                  }
-                >
-                  Adicionar
-                </Button>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                Subtotal
+              </label>
+              <div className="flex h-10 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700">
+                {formatCurrency(newLineTotal)}
               </div>
             </div>
+            <div className="flex items-end">
+              <Button
+                size="sm"
+                onClick={handleAddItem}
+                disabled={actionLoading || !newItemId || !newQuantity || !newUnitPrice}
+                className="w-full"
+              >
+                Adicionar
+              </Button>
+            </div>
           </div>
-        )}
+          {newNotes !== undefined && (
+            <input
+              type="text"
+              value={newNotes}
+              onChange={(e) => setNewNotes(e.target.value)}
+              placeholder="Observação do item (opcional)"
+              className="h-9 w-full rounded-lg border border-slate-200 px-3 text-xs text-slate-600"
+            />
+          )}
+        </div>
+      )}
+
+      {/* Items table */}
+      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="text-base font-semibold text-slate-900">
+            Itens do Pedido ({items.length})
+          </h3>
+        </div>
 
         {items.length === 0 ? (
-          <p className="text-sm text-slate-500">Nenhum item adicionado.</p>
+          <div className="p-8 text-center">
+            <p className="text-slate-500">Nenhum item adicionado.</p>
+            {isDraft && (
+              <p className="mt-1 text-xs text-slate-400">
+                Use o formulário acima para adicionar itens ao pedido.
+              </p>
+            )}
+          </div>
         ) : (
-          <div className="overflow-auto">
-            <table className="w-full min-w-[500px] text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="px-3 py-2 text-left font-medium text-slate-600">
-                    Item
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="text-left px-4 py-2.5 font-medium text-slate-600">
+                  Item
+                </th>
+                <th className="text-right px-4 py-2.5 font-medium text-slate-600">
+                  Qtd
+                </th>
+                <th className="text-right px-4 py-2.5 font-medium text-slate-600">
+                  Preço Unit.
+                </th>
+                <th className="text-right px-4 py-2.5 font-medium text-slate-600">
+                  Subtotal
+                </th>
+                {isDraft && (
+                  <th className="text-center px-4 py-2.5 font-medium text-slate-600 w-28">
+                    Ações
                   </th>
-                  <th className="px-3 py-2 text-right font-medium text-slate-600">
-                    Qtd
-                  </th>
-                  <th className="px-3 py-2 text-right font-medium text-slate-600">
-                    Custo Unit.
-                  </th>
-                  <th className="px-3 py-2 text-right font-medium text-slate-600">
-                    Total
-                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className="border-b border-slate-100">
+                  <td className="px-4 py-2.5">
+                    <span className="font-medium text-slate-900">
+                      {item.item_name}
+                    </span>
+                    {item.notes && (
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {item.notes}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    {editingItemId === item.id ? (
+                      <div className="flex items-center justify-end gap-1">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editQty}
+                          onChange={(e) => setEditQty(e.target.value)}
+                          className="h-7 w-20 rounded border border-slate-300 px-2 text-right text-xs"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveQty(item.id);
+                            if (e.key === "Escape") setEditingItemId(null);
+                          }}
+                        />
+                        <button
+                          onClick={() => handleSaveQty(item.id)}
+                          className="text-green-600 text-xs hover:underline"
+                        >
+                          OK
+                        </button>
+                      </div>
+                    ) : (
+                      <span
+                        className={isDraft ? "cursor-pointer hover:text-primary-600 hover:underline" : ""}
+                        onClick={() => {
+                          if (isDraft) {
+                            setEditingItemId(item.id);
+                            setEditQty(String(item.quantity));
+                          }
+                        }}
+                        title={isDraft ? "Clique para editar" : undefined}
+                      >
+                        {Number(item.quantity).toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-slate-700">
+                    {formatCurrency(Number(item.unit_cost))}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-semibold text-slate-900">
+                    {formatCurrency(Number(item.total_cost))}
+                  </td>
                   {isDraft && (
-                    <th className="px-3 py-2 text-center font-medium text-slate-600">
-                      Ações
-                    </th>
+                    <td className="px-4 py-2.5 text-center">
+                      <button
+                        onClick={() => handleRemoveItem(item.id)}
+                        className="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        Remover
+                      </button>
+                    </td>
                   )}
                 </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100">
-                    <td className="px-3 py-2 font-medium text-slate-900">
-                      {itemMap[item.item_id] ?? item.item_id}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {Number(item.quantity).toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {formatCurrency(Number(item.unit_cost))}
-                    </td>
-                    <td className="px-3 py-2 text-right font-medium">
-                      {formatCurrency(Number(item.total_cost))}
-                    </td>
-                    {isDraft && (
-                      <td className="px-3 py-2 text-center">
-                        <button
-                          onClick={() => handleRemoveItem(item.id)}
-                          className="rounded px-2 py-1 text-xs text-danger hover:bg-danger/10"
-                          title="Remover"
-                        >
-                          Remover
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-slate-50 font-semibold">
-                  <td
-                    colSpan={isDraft ? 3 : 3}
-                    className="px-3 py-2 text-right text-slate-700"
-                  >
-                    Total:
-                  </td>
-                  <td className="px-3 py-2 text-right text-slate-900">
-                    {formatCurrency(itemsTotal)}
-                  </td>
-                  {isDraft && <td />}
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="bg-slate-50 font-semibold">
+                <td
+                  colSpan={isDraft ? 3 : 3}
+                  className="px-4 py-3 text-right text-slate-700"
+                >
+                  TOTAL:
+                </td>
+                <td className="px-4 py-3 text-right text-lg text-slate-900">
+                  {formatCurrency(itemsTotal)}
+                </td>
+                {isDraft && <td />}
+              </tr>
+            </tfoot>
+          </table>
         )}
       </div>
 
-      {/* Actions section - only if draft */}
+      {/* Actions */}
       {isDraft && (
         <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
-          <h3 className="text-lg font-semibold text-slate-900">
-            Confirmar Pedido
+          <h3 className="text-base font-semibold text-slate-900">
+            Ações do Pedido
           </h3>
           <p className="text-sm text-slate-600">
-            A confirmação gera: estoque OUT no CD + IN na loja destino +
-            débito no banco virtual.
+            A confirmação é <strong>atômica e irreversível</strong>: gera estoque OUT no CD,
+            IN na loja destino, e débito no banco virtual.
           </p>
-          <Button
-            variant="primary"
-            onClick={handleConfirm}
-            loading={actionLoading}
-          >
-            Confirmar Pedido
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              variant="primary"
+              onClick={handleConfirm}
+              disabled={actionLoading || items.length === 0}
+            >
+              {actionLoading ? "Processando..." : "Confirmar Pedido"}
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleCancel}
+              disabled={actionLoading}
+            >
+              Cancelar Pedido
+            </Button>
+          </div>
+          {items.length === 0 && (
+            <p className="text-xs text-amber-600">
+              Adicione pelo menos 1 item para poder confirmar.
+            </p>
+          )}
         </div>
       )}
     </div>

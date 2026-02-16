@@ -1,9 +1,12 @@
-feat: parser OFX real, importacao NF-e XML e convite de usuarios
+fix: refatorar modulo CD->Loja como venda real com linhas de itens
 
-- Parser OFX: le arquivo .ofx, extrai transacoes, staging idempotente por FITID/hash
-- Parser NF-e XML: extrai chave, emitente, itens, totais, duplicatas do XML padrao SEFAZ 4.00
-- Importacao OFX: Server Action + UI com upload, selecao de loja/conta, resumo
-- Importacao NF-e: Server Action + UI com auto-match de fornecedor por CNPJ e itens por nome/EAN
-- Convite de usuarios: admin pode convidar por e-mail com role e acesso a lojas
-- Novas rotas: /conciliacao/importar, /compras/importar-nfe
-- Botoes de importacao nas listagens existentes de compras e conciliacao
+- FIX BUG CRITICO: newSourceIndex -> newSourceStoreId (pedido nunca era criado)
+- Tabela de pedidos agora mostra: data, origem, destino, status, qtd itens, total
+- Detalhe do pedido mostra nomes das lojas (origem/destino) em vez de UUIDs
+- Formulario de itens: busca preco automatico da tabela item_prices por loja destino
+- Edicao inline de quantidade (clique na qty para editar)
+- Botao de cancelar pedido adicionado
+- Actions refatoradas: listInternalOrders e getInternalOrder resolvem nomes de lojas
+- Nova action: updateInternalOrderItem, cancelInternalOrder, getItemPriceForStore
+- Items resolvem nomes via join em getInternalOrderItems
+- Seed de teste: 2 itens extras, precos para NB e Praca, 1 pedido rascunho com 2 itens
