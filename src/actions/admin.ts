@@ -29,6 +29,118 @@ async function getAdminContext() {
 }
 
 // ===========================================
+// Convidar usuário por e-mail
+// ===========================================
+
+export async function inviteUser(data: {
+  email: string;
+  fullName: string;
+  role: string;
+  storeIds: string[];
+}): Promise<ActionResult<{ userId: string }>> {
+  try {
+    const { supabase, orgId } = await getAdminContext();
+
+    // Verificar se já existe perfil com esse e-mail
+    const { data: existingProfiles } = await supabase
+      .from("profiles")
+      .select("id, email")
+      .eq("org_id", orgId)
+      .eq("email", data.email.toLowerCase().trim())
+      .limit(1);
+
+    if (existingProfiles && existingProfiles.length > 0) {
+      return {
+        success: false,
+        error: `Já existe um usuário com o e-mail ${data.email} nesta organização`,
+      };
+    }
+
+    // Criar usuário via Supabase Auth (invite)
+    // Usa a API admin do Supabase para criar o usuário e enviar convite
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: data.email.toLowerCase().trim(),
+      email_confirm: false,
+      user_metadata: {
+        full_name: data.fullName,
+        org_id: orgId,
+        role: data.role,
+      },
+    });
+
+    if (authError) {
+      // Fallback: se não tem acesso admin, orientar
+      if (authError.message.includes("not authorized") || authError.message.includes("not allowed")) {
+        return {
+          success: false,
+          error: "Sem permissão para criar usuários via API admin. Peça ao usuário para se registrar e depois configure o acesso.",
+        };
+      }
+      return { success: false, error: authError.message };
+    }
+
+    const newUserId = authData.user.id;
+
+    // Criar perfil
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: newUserId,
+      org_id: orgId,
+      full_name: data.fullName,
+      email: data.email.toLowerCase().trim(),
+      role: data.role,
+      is_active: true,
+    });
+
+    if (profileError) {
+      return { success: false, error: `Usuário criado mas falha no perfil: ${profileError.message}` };
+    }
+
+    // Conceder acesso às lojas
+    if (data.storeIds.length > 0) {
+      const storeRows = data.storeIds.map((storeId) => ({
+        org_id: orgId,
+        user_id: newUserId,
+        store_id: storeId,
+      }));
+
+      const { error: storeError } = await supabase
+        .from("user_store_access")
+        .insert(storeRows);
+
+      if (storeError) {
+        console.error("[INVITE] Falha ao conceder acesso a lojas:", storeError);
+      }
+    }
+
+    // Enviar e-mail de convite via Supabase
+    await supabase.auth.admin.inviteUserByEmail(data.email.toLowerCase().trim());
+
+    // Audit
+    await supabase.rpc("fn_audit_log", {
+      p_org_id: orgId,
+      p_action: "invite_user",
+      p_table_name: "profiles",
+      p_record_id: newUserId,
+      p_old_data: null,
+      p_new_data: {
+        email: data.email,
+        full_name: data.fullName,
+        role: data.role,
+        stores: data.storeIds,
+      },
+    });
+
+    revalidatePath("/admin");
+    return { success: true, data: { userId: newUserId } };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Erro ao convidar usuário",
+    };
+  }
+}
+
+// ===========================================
 // Listar usuários da organização
 // ===========================================
 

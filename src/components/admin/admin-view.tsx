@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { Profile, Store } from "@/types/database";
-import { updateUserRole, toggleUserActive, updateStore } from "@/actions/admin";
+import { updateUserRole, toggleUserActive, updateStore, inviteUser } from "@/actions/admin";
 
 interface EnrichedProfile extends Profile {
   store_count: number;
@@ -39,6 +39,47 @@ export function AdminView({ users, stores }: Props) {
   const [activeTab, setActiveTab] = useState<"users" | "stores">("users");
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState("store_manager");
+  const [inviteStores, setInviteStores] = useState<string[]>([]);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState("");
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim() || !inviteName.trim()) return;
+    setInviteLoading(true);
+    setError(null);
+    setInviteSuccess("");
+
+    const result = await inviteUser({
+      email: inviteEmail.trim(),
+      fullName: inviteName.trim(),
+      role: inviteRole,
+      storeIds: inviteStores,
+    });
+
+    setInviteLoading(false);
+
+    if (result.success) {
+      setInviteSuccess(`Convite enviado para ${inviteEmail}`);
+      setInviteEmail("");
+      setInviteName("");
+      setInviteRole("store_manager");
+      setInviteStores([]);
+      setShowInvite(false);
+      router.refresh();
+    } else {
+      setError(result.error ?? "Erro ao convidar");
+    }
+  };
+
+  const toggleInviteStore = (storeId: string) => {
+    setInviteStores((prev) =>
+      prev.includes(storeId) ? prev.filter((id) => id !== storeId) : [...prev, storeId]
+    );
+  };
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     setLoading(userId);
@@ -115,6 +156,87 @@ export function AdminView({ users, stores }: Props) {
       {/* Users Tab */}
       {activeTab === "users" && (
         <div className="mt-4 space-y-3">
+          {/* Botão convite */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-slate-500">{users.length} usuário(s)</span>
+            <Button size="sm" onClick={() => setShowInvite(!showInvite)}>
+              {showInvite ? "Fechar" : "Convidar Usuário"}
+            </Button>
+          </div>
+
+          {inviteSuccess && (
+            <div className="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700">
+              {inviteSuccess}
+            </div>
+          )}
+
+          {/* Formulário de convite */}
+          {showInvite && (
+            <Card className="p-5 space-y-4 border-primary-200 bg-primary-50/30">
+              <h3 className="text-sm font-semibold text-slate-900">Convidar novo usuário</h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Nome completo</label>
+                  <input
+                    type="text"
+                    value={inviteName}
+                    onChange={(e) => setInviteName(e.target.value)}
+                    placeholder="João Silva"
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">E-mail</label>
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="joao@exemplo.com"
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Perfil / Role</label>
+                  <select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  >
+                    {roleOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Lojas com acesso</label>
+                  <div className="flex flex-wrap gap-2">
+                    {stores.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => toggleInviteStore(s.id)}
+                        className={`rounded-md px-2 py-1 text-xs font-medium border transition-colors ${
+                          inviteStores.includes(s.id)
+                            ? "bg-primary-600 text-white border-primary-600"
+                            : "bg-white text-slate-600 border-slate-300 hover:border-primary-400"
+                        }`}
+                      >
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={handleInvite}
+                disabled={inviteLoading || !inviteEmail.trim() || !inviteName.trim()}
+              >
+                {inviteLoading ? "Enviando..." : "Enviar Convite"}
+              </Button>
+            </Card>
+          )}
+
           {users.length === 0 ? (
             <p className="py-8 text-center text-sm text-slate-500">Nenhum usuário encontrado</p>
           ) : (

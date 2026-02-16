@@ -44,6 +44,7 @@ export type DocumentType =
   | "nf_xml"
   | "nf_pdf"
   | "nf_photo"
+  | "invoice_xml"
   | "ofx"
   | "receipt"
   | "checklist_evidence"
@@ -116,7 +117,7 @@ export type InternalOrderStatus = "draft" | "confirmed" | "cancelled";
 export type ProductionOrderStatus = "draft" | "in_progress" | "finalized" | "cancelled";
 
 // === Status de Importação OFX ===
-export type OfxImportStatus = "pending" | "processing" | "completed" | "failed";
+export type OfxImportStatus = "pending" | "processing" | "imported" | "partial" | "completed" | "failed";
 
 // === Status de Linha OFX ===
 export type OfxLineStatus = "pending" | "matched" | "split" | "ignored" | "created";

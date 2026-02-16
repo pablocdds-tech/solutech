@@ -11,7 +11,7 @@
 -- >>> SUBSTITUIR PELO UUID REAL DO USUÁRIO <<<
 DO $$
 DECLARE
-  v_user_id uuid := '<USER_UUID_AQUI>';
+  v_user_id uuid := '4375f451-89c8-458a-83c4-5211d78cf529';
   v_org_id  uuid := '00000000-0000-0000-0000-000000000001';
 BEGIN
 

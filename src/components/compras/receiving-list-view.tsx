@@ -128,11 +128,18 @@ export function ReceivingListView() {
             </button>
           ))}
         </div>
-        <Link href="/compras/novo">
-          <Button variant="primary" size="sm">
-            Novo Recebimento
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/compras/importar-nfe">
+            <Button variant="primary" size="sm">
+              Importar NF-e (XML)
+            </Button>
+          </Link>
+          <Link href="/compras/novo">
+            <Button variant="outline" size="sm">
+              Novo Manual
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Resumo */}

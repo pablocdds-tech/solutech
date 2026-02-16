@@ -117,6 +117,11 @@ export function OfxImportsView() {
           <Button size="sm" onClick={() => setShowForm(!showForm)}>
             {showForm ? "Fechar" : "Nova Importação"}
           </Button>
+          <Link href="/conciliacao/importar">
+            <Button variant="primary" size="sm">
+              Importar Arquivo OFX
+            </Button>
+          </Link>
         </div>
       </div>
 
