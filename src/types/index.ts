@@ -109,6 +109,9 @@ export type ArReceivableStatus = "pending" | "partial" | "received" | "cancelled
 // === Status de Sessão de Caixa ===
 export type CashSessionStatus = "open" | "closed";
 
+// === Status de Pedido Interno (CD→Loja) ===
+export type InternalOrderStatus = "draft" | "confirmed" | "cancelled";
+
 // === Paginação ===
 export interface PaginationParams {
   page: number;

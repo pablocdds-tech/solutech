@@ -683,3 +683,48 @@ export type ArReceivableInsert = Omit<ArReceivable, "id" | "created_at" | "updat
 export type CashSessionInsert = Omit<CashSession, "id" | "created_at" | "updated_at" | "closed_at" | "closed_by"> & {
   id?: string;
 };
+
+// === Tabelas FASE 6 — CD→Loja + Banco Virtual ===
+
+export interface InternalOrder {
+  id: string;
+  org_id: string;
+  source_store_id: string;
+  destination_store_id: string;
+  status: import("./index").InternalOrderStatus;
+  order_date: string;
+  total_amount: number;
+  notes: string | null;
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  source_type: import("./index").SourceType;
+  source_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InternalOrderItem {
+  id: string;
+  org_id: string;
+  internal_order_id: string;
+  item_id: string;
+  quantity: number;
+  unit_cost: number;
+  total_cost: number;
+  unit_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type InternalOrderInsert = Omit<
+  InternalOrder,
+  "id" | "created_at" | "updated_at" | "confirmed_at" | "confirmed_by" | "cancelled_at" | "cancelled_by" | "total_amount"
+> & { id?: string };
+
+export type InternalOrderItemInsert = Omit<InternalOrderItem, "id" | "created_at" | "updated_at" | "total_cost"> & {
+  id?: string;
+};

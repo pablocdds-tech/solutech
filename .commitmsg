@@ -1,0 +1,15 @@
+FASE 6: CD→Loja + Banco Virtual (fluxo completo)
+
+- Tabelas: internal_orders, internal_order_items
+- Enum: internal_order_status (draft, confirmed, cancelled)
+- fn_confirm_internal_order: atomica + idempotente (OUT CD + IN loja + DEBIT ledger + audit)
+- fn_settle_virtual_balance: atomica (bank_tx DEBIT + CREDIT ledger + baixa AP + audit)
+- fn_adjust_virtual_balance_admin: ajuste excepcional com audit CRITICAL (somente admins)
+- RLS: org_id para pedidos internos e itens
+- Action Catalog: createInternalOrder, addInternalOrderItem, removeInternalOrderItem,
+  confirmInternalOrder, settleVirtualBalance, adjustVirtualBalanceAdmin,
+  listInternalOrders, getInternalOrder, getInternalOrderItems
+- Types: InternalOrder, InternalOrderItem + Insert types
+- Paginas: /cd-loja (listagem + criar), /cd-loja/[id] (detalhe + confirmar),
+  /cd-loja/liquidar (liquidar banco virtual com pagamento real)
+- Nav: CD→Loja adicionado ao sidebar
